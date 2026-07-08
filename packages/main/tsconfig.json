@@ -1,0 +1,36 @@
+{
+  "compilerOptions": {
+    "allowSyntheticDefaultImports": true,
+    "module": "NodeNext",
+    "target": "ESNext",
+    "sourceMap": false,
+    "moduleResolution": "NodeNext",
+    "skipLibCheck": true,
+    "strict": true,
+    "isolatedModules": true,
+    "types": [
+      "node"
+    ],
+    "ignoreDeprecations": "6.0",
+    "baseUrl": ".",
+    "paths": {
+      "@app/preload": [
+        "../preload"
+      ],
+      "@app/renderer": [
+        "../renderer"
+      ],
+      "@app/api": [
+        "../api"
+      ]
+    }
+  },
+  "include": [
+    "src/**/*.ts",
+    "../../types/**/*.d.ts"
+  ],
+  "exclude": [
+    "**/*.spec.ts",
+    "**/*.test.ts"
+  ]
+}

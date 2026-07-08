@@ -1,0 +1,22 @@
+{
+  "name": "@app/api",
+  "type": "module",
+  "types": "./src/index.ts",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "devDependencies": {
+    "@types/node": "25.5.0",
+    "typescript": "6.0.2"
+  },
+  "dependencies": {
+    "node-fetch-cache": "^5.1.0"
+  }
+}

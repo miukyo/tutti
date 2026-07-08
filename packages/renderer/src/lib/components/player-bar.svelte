@@ -1,0 +1,164 @@
+<script lang="ts">
+  import {
+    ChevronLeftIcon,
+    FastForwardIcon,
+    ListIcon,
+    PlayIcon,
+    PauseIcon,
+    RepeatIcon,
+    ShuffleIcon,
+    ThumbsDownIcon,
+    ThumbsUpIcon,
+    Volume2Icon,
+    VolumeXIcon,
+  } from "@lucide/svelte";
+  import Button from "./ui/button/button.svelte";
+  import Slider from "./ui/slider/slider.svelte";
+  import { player } from "$lib/stores/player.svelte";
+
+  function formatTime(seconds: number): string {
+    if (isNaN(seconds)) return "0:00";
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = Math.floor(seconds % 60);
+    return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
+  }
+
+  // Synchronize mute/unmute
+  let isMuted = $derived(player.isMuted);
+  let isPlaying = $derived(player.isPlaying);
+  let currentTime = $derived(player.currentTime);
+  let duration = $derived(player.duration);
+  let currentTrack = $derived(player.currentTrack);
+
+  let isDragging = $state(false);
+  let sliderValue = $state(0);
+
+  $effect(() => {
+    if (!isDragging) {
+      sliderValue = currentTime;
+    }
+  });
+</script>
+
+<div class="absolute bottom-0 p-4 w-full select-none z-50">
+  <div
+    class="flex justify-between gap-4 border border-border bg-background/50 backdrop-blur-sm shadow-glass p-4 rounded-4xl items-center relative"
+  >
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div
+      class="absolute top-0 left-0 w-full z-10 px-4"
+      onpointerdown={() => {
+        isDragging = true;
+      }}
+    >
+      <Slider
+        class="w-full h-2 -mt-1 **:data-[slot='slider-track']:bg-foreground/10 **:data-[slot='slider-track']:h-0.5 **:data-[slot='slider-track']:bg-transparent **:data-[slot='slider-thumb']:h-2 **:data-[slot='slider-thumb']:w-4 **:data-[slot='slider-thumb']:ring-0 **:data-[slot='slider-thumb']:bg-primary **:data-[slot='slider-thumb']:scale-0 **:data-[slot='slider-thumb']:group-hover:scale-100 **:data-[slot='slider-thumb']:transition-[scale]"
+        type="single"
+        orientation="horizontal"
+        value={sliderValue}
+        onValueChange={(val) => {
+          if (isDragging) {
+            const numVal = Array.isArray(val) ? val[0] : val;
+            sliderValue = numVal;
+          }
+        }}
+        onValueCommit={(val) => {
+          const numVal = Array.isArray(val) ? val[0] : val;
+          player.seek(numVal);
+          isDragging = false;
+        }}
+        max={duration || 100}
+        step={1}
+      />
+    </div>
+    <div class="flex items-center">
+      <Button size="icon-sm" variant="link">
+        <ShuffleIcon strokeWidth={4} class="size-4" />
+      </Button>
+      <Button size="icon" variant="link" onclick={() => player.prev()}>
+        <FastForwardIcon class="size-6 rotate-180" fill="currentColor" />
+      </Button>
+      <Button size="icon" variant="link" onclick={() => player.togglePlay()}>
+        {#if isPlaying}
+          <PauseIcon class="size-8" fill="currentColor" />
+        {:else}
+          <PlayIcon class="size-8" fill="currentColor" />
+        {/if}
+      </Button>
+      <Button size="icon" variant="link" onclick={() => player.next()}>
+        <FastForwardIcon class="size-6" fill="currentColor" />
+      </Button>
+      <Button size="icon-sm" variant="link">
+        <RepeatIcon strokeWidth={4} class="size-4" />
+      </Button>
+    </div>
+
+    <!-- Center playback & track info -->
+    <div
+      class="absolute w-1/3 h-full top-0 left-1/2 -translate-x-1/2 py-2 flex flex-col justify-center"
+    >
+      <div
+        class="w-full flex items-center justify-between gap-2 bg-foreground/5 pl-1.5 pr-3 h-14 rounded-2xl border border-border/50"
+      >
+        {#if currentTrack}
+          <div class="flex gap-2 items-center min-w-0">
+            <img
+              src={currentTrack.thumbnail}
+              alt={currentTrack.name}
+              class="size-9 bg-background rounded-lg object-cover"
+            />
+            <div class="min-w-0">
+              <p class="text-xs font-semibold truncate leading-tight">
+                {currentTrack.name}
+              </p>
+              <p
+                class="text-[10px] text-muted-foreground truncate leading-tight"
+              >
+                {currentTrack.artist}
+              </p>
+            </div>
+          </div>
+          <div
+            class="flex items-center gap-1.5 text-[10px] text-muted-foreground whitespace-nowrap"
+          >
+            <span
+              >{formatTime(currentTime)}
+              /
+              {formatTime(duration)}</span
+            >
+          </div>
+        {:else}
+          <div class="w-full text-center text-xs text-muted-foreground">
+            No track selected
+          </div>
+        {/if}
+      </div>
+    </div>
+
+    <div class="flex items-center gap-2">
+      <Button size="icon" variant="link" onclick={() => player.toggleMute()}>
+        {#if isMuted}
+          <VolumeXIcon class="size-5" fill="currentColor" />
+        {:else}
+          <Volume2Icon class="size-5" fill="currentColor" />
+        {/if}
+      </Button>
+      <!-- Svelte 5 slider volume bindings -->
+      <Slider
+        class="w-30  **:data-slider-thumb:w-0 **:data-slider-thumb:opacity-0  **:data-[slot='slider-track']:bg-foreground/10"
+        type="single"
+        orientation="horizontal"
+        value={player.isMuted ? 0 : player.volume}
+        onValueChange={(val) => {
+          if (Array.isArray(val)) {
+            player.setVolume(val[0]);
+          } else {
+            player.setVolume(val);
+          }
+        }}
+        max={100}
+        step={1}
+      />
+    </div>
+  </div>
+</div>
