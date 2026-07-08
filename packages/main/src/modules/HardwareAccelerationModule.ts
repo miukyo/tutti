@@ -1,21 +1,13 @@
-import {AppModule} from '../AppModule.js';
-import {ModuleContext} from '../ModuleContext.js';
+import type { AppModule } from '../AppModule.js';
+import type { ModuleContext } from '../ModuleContext.js';
 
-export class HardwareAccelerationModule implements AppModule {
-  readonly #shouldBeDisabled: boolean;
-
-
-  constructor({enable}: {enable: boolean}) {
-    this.#shouldBeDisabled = !enable;
-  }
-
-  enable({app}: ModuleContext): Promise<void> | void {
-    if (this.#shouldBeDisabled) {
-      app.disableHardwareAcceleration();
+// ponytail: stateless AppModule replacement for HardwareAccelerationModule class
+export function hardwareAccelerationMode({ enable }: { enable: boolean }): AppModule {
+  return {
+    enable({ app }: ModuleContext): void {
+      if (!enable) {
+        app.disableHardwareAcceleration();
+      }
     }
-  }
-}
-
-export function hardwareAccelerationMode(...args: ConstructorParameters<typeof HardwareAccelerationModule>) {
-  return new HardwareAccelerationModule(...args);
+  };
 }

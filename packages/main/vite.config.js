@@ -1,34 +1,34 @@
-import {getNodeMajorVersion} from '@app/electron-versions';
-import {spawn} from 'child_process';
+import { getNodeMajorVersion } from '@app/electron-versions';
+import { spawn } from 'child_process';
 import electronPath from 'electron';
 
 export default /**
  * @type {import('vite').UserConfig}
  * @see https://vitejs.dev/config/
  */
-({
-  build: {
-    ssr: true,
-    sourcemap: 'inline',
-    outDir: 'dist',
-    assetsDir: '.',
-    target: `node${getNodeMajorVersion()}`,
-    lib: {
-      entry: 'src/index.ts',
-      formats: ['es'],
-    },
-    rollupOptions: {
-      output: {
-        entryFileNames: '[name].js',
+  ({
+    build: {
+      ssr: true,
+      sourcemap: 'inline',
+      outDir: 'dist',
+      assetsDir: '.',
+      target: `node${getNodeMajorVersion()}`,
+      lib: {
+        entry: 'src/index.ts',
+        formats: ['es'],
       },
+      rollupOptions: {
+        output: {
+          entryFileNames: '[name].js',
+        },
+      },
+      emptyOutDir: true,
+      reportCompressedSize: false,
     },
-    emptyOutDir: true,
-    reportCompressedSize: false,
-  },
-  plugins: [
-    handleHotReload(),
-  ],
-});
+    plugins: [
+      handleHotReload(),
+    ],
+  });
 
 
 /**

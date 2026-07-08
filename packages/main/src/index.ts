@@ -1,5 +1,5 @@
+import { app } from 'electron';
 import type { AppInitConfig } from './AppInitConfig.js';
-import { createModuleRunner } from './ModuleRunner.js';
 import { disallowMultipleAppInstance } from './modules/SingleInstanceApp.js';
 import { createWindowManagerModule } from './modules/WindowManager.js';
 import { terminateAppOnLastWindowClose } from './modules/ApplicationTerminatorOnLastWindowClose.js';
@@ -8,36 +8,33 @@ import { autoUpdater } from './modules/AutoUpdater.js';
 import { allowInternalOrigins } from './modules/BlockNotAllowdOrigins.js';
 import { allowExternalUrls } from './modules/ExternalUrls.js';
 import { ytmusicModule } from './modules/YTMusicApiModule.js';
-
+import { garbageCollectorModule } from './modules/GarbageCollectorModule.js';
 
 export async function initApp(initConfig: AppInitConfig) {
-  const moduleRunner = createModuleRunner()
-    .init(createWindowManagerModule({ initConfig, openDevTools: import.meta.env.DEV }))
-    .init(disallowMultipleAppInstance())
-    .init(terminateAppOnLastWindowClose())
-    .init(hardwareAccelerationMode({ enable: true }))
-    .init(autoUpdater())
-    .init(ytmusicModule())
+  // Expose garbage collection globally in Node and Chromium
+  app.commandLine.appendSwitch('js-flags', '--expose-gc');
 
-    // Install DevTools extension if needed
-    // .init(chromeDevToolsExtension({extension: 'VUEJS3_DEVTOOLS'}))
-
-    // Security
-    .init(allowInternalOrigins(
+  const modules = [
+    disallowMultipleAppInstance(),
+    terminateAppOnLastWindowClose(),
+    hardwareAccelerationMode({ enable: true }),
+    autoUpdater(),
+    ytmusicModule(),
+    allowInternalOrigins(
       new Set([
         ...(initConfig.renderer instanceof URL ? [initConfig.renderer.origin] : []),
         'https://accounts.google.com',
         'https://music.youtube.com',
         'https://accounts.youtube.com',
       ]),
-    ))
-    .init(allowExternalUrls(
-      new Set(
-        initConfig.renderer instanceof URL
-          ? []
-          : [],
-      )),
-    );
+    ),
+    // ponytail: simplified empty Set instantiation
+    allowExternalUrls(new Set()),
+    garbageCollectorModule(),
+    createWindowManagerModule({ initConfig, openDevTools: import.meta.env.DEV }),
+  ];
 
-  await moduleRunner;
+  for (const module of modules) {
+    await module.enable({ app });
+  }
 }

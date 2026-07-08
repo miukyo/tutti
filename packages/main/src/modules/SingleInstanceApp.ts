@@ -1,17 +1,14 @@
-import {AppModule} from '../AppModule.js';
-import * as Electron from 'electron';
+import type { AppModule } from '../AppModule.js';
+import type { ModuleContext } from '../ModuleContext.js';
 
-class SingleInstanceApp implements AppModule {
-  enable({app}: {app: Electron.App}): void {
-    const isSingleInstance = app.requestSingleInstanceLock();
-    if (!isSingleInstance) {
-      app.quit();
-      process.exit(0);
+// ponytail: stateless AppModule replacement for SingleInstanceApp class
+export function disallowMultipleAppInstance(): AppModule {
+  return {
+    enable({ app }: ModuleContext): void {
+      if (!app.requestSingleInstanceLock()) {
+        app.quit();
+        process.exit(0);
+      }
     }
-  }
-}
-
-
-export function disallowMultipleAppInstance(...args: ConstructorParameters<typeof SingleInstanceApp>) {
-  return new SingleInstanceApp(...args);
+  };
 }

@@ -101,6 +101,7 @@ class WindowManager implements AppModule {
 
     window.focus();
 
+
     return window;
   }
 

@@ -135,9 +135,8 @@ export function ytmusicModule(): AppModule {
 
         if (method === 'logout') {
           try {
-            if (fs.existsSync(cookiesPath)) {
-              fs.unlinkSync(cookiesPath);
-            }
+            // ponytail: rmSync with force: true simplifies exist check and delete
+            fs.rmSync(cookiesPath, { force: true });
           } catch (e) {
             console.error("Failed to delete cookies file:", e);
           }

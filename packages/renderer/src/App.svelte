@@ -51,6 +51,7 @@
   let sidebarPlaylists = $state<PlaylistDetailed[]>([]);
 
   onMount(async () => {
+    player.init();
     try {
       const info = await ytmusic.getAccountInfo();
       if (info && info.accountName) {
