@@ -48,7 +48,14 @@ class PlayerStore {
     return this.#activeSidebar;
   }
   set activeSidebar(val: 'none' | 'lyrics' | 'queue') {
-    this.#activeSidebar = val;
+    if (typeof document !== "undefined" && document.startViewTransition) {
+      document.startViewTransition(async () => {
+        this.#activeSidebar = val;
+        await tick();
+      });
+    } else {
+      this.#activeSidebar = val;
+    }
     this.saveState();
   }
 

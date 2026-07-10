@@ -169,13 +169,11 @@
                 style="view-transition-name: player-thumbnail;"
               />
               <div class="min-w-0">
-                <p
-                  class="text-xs font-semibold truncate leading-tight group-hover:text-primary"
-                >
+                <p class="text-xs font-semibold truncate leading-tight">
                   {currentTrack.name}
                 </p>
                 <p
-                  class="text-[10px] text-muted-foreground truncate leading-tight group-hover:text-primary"
+                  class="text-[10px] text-muted-foreground truncate leading-tight"
                 >
                   {currentTrack.artist}
                 </p>
