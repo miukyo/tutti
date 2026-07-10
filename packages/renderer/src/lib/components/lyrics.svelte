@@ -4,12 +4,21 @@
   import { Spinner } from "$lib/components/ui/spinner";
   import type { LyricResult, LyricLine } from "@app/api/src/types";
   import { Music2Icon, Music3Icon } from "@lucide/svelte";
+  import { GoogleService } from "../google-tl";
 
   let lyricsResult = $state<LyricResult | null>(null);
   let loading = $state(false);
   let containerEl = $state<HTMLDivElement | null>(null);
+  let linesContainerEl = $state<HTMLDivElement | null>(null);
   let isUserScrolling = $state(false);
+  let containerHeight = $state(0);
+  let contentHeight = $state(0);
+  let userScrollOffset = $state(0);
   let userScrollingTimeout: any = null;
+  let {
+    showInfo = false,
+    isExtended = false,
+  }: { showInfo?: boolean; isExtended?: boolean } = $props();
 
   // React to track changes
   $effect(() => {
@@ -69,7 +78,7 @@
         // Step 2: Insert instrumental breaks
         if (result.synced) {
           const processedLinesWithBreaks = [];
-          const gapThreshold = 5000;
+          const gapThreshold = 10000;
 
           const createInstrumental = (startTimeMs: number): LyricLine => ({
             startTimeMs,
@@ -189,8 +198,23 @@
           processedLines.push(line);
         }
         result.lines = processedLines;
+        lyricsResult = result;
+
+        // Romanize non-Latin lyrics in the background
+        try {
+          const romanizedLines = await GoogleService.romanize(result.lines);
+          if (player.currentTrack?.videoId === videoId) {
+            lyricsResult = {
+              synced: result.synced,
+              source: result.source,
+              wordSynced: result.wordSynced,
+              lines: romanizedLines,
+            };
+          }
+        } catch (romanizeError) {
+          console.warn("Romanization failed:", romanizeError);
+        }
       }
-      lyricsResult = result;
     } catch (e) {
       if (player.currentTrack?.videoId === videoId) {
         console.error("Failed to fetch lyrics:", e);
@@ -290,84 +314,155 @@
   // Calculate scroll target index based on first active line (or fallback)
   let scrollTargetIndex = $derived(getFirstActiveIndex(adjustedTimeMs));
 
-  let scrollAnimId: number;
-  let isProgrammaticScrolling = false;
+  let stableTargetIndex = $state(-1);
+  let lastIndexChangeTime = 0;
 
-  function easeInOutQuart(t: number) {
-    return t < 0.5 ? 8 * t * t * t * t : 1 - Math.pow(-2 * t + 2, 4) / 2;
-  }
-
-  function smoothScrollTo(
-    element: HTMLElement,
-    target: number,
-    duration: number,
-  ) {
-    if (scrollAnimId) cancelAnimationFrame(scrollAnimId);
-    const start = element.scrollTop;
-    const change = target - start;
-    const startTime = performance.now();
-
-    function animateScroll(currentTime: number) {
-      const elapsed = currentTime - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-      const ease = easeInOutQuart(progress);
-
-      isProgrammaticScrolling = true;
-      element.scrollTop = start + change * ease;
-
-      if (progress < 1) {
-        scrollAnimId = requestAnimationFrame(animateScroll);
-      } else {
-        requestAnimationFrame(() => {
-          isProgrammaticScrolling = false;
-        });
-      }
-    }
-
-    scrollAnimId = requestAnimationFrame(animateScroll);
-  }
-
-  // Automatically scroll current active line to center at 37% ratio
+  // Track track changes to reset time and index immediately
   $effect(() => {
-    if (scrollTargetIndex !== -1 && containerEl && !isUserScrolling) {
-      const activeEl = containerEl.querySelector(
-        `[data-index="${scrollTargetIndex}"]`,
-      ) as HTMLElement;
-      if (activeEl) {
-        const containerHeight = containerEl.clientHeight;
-        const activeOffsetTop = activeEl.offsetTop;
-        const activeHeight = activeEl.clientHeight;
-        const targetScrollTop =
-          activeOffsetTop - containerHeight * 0.37 + activeHeight / 2;
-
-        smoothScrollTo(containerEl, targetScrollTop, 750);
-      }
+    if (player.currentTrack) {
+      lastIndexChangeTime = 0;
+      stableTargetIndex = -1;
     }
   });
 
-  function handleScroll() {
-    if (isProgrammaticScrolling) return;
+  $effect(() => {
+    const newIndex = scrollTargetIndex;
+    if (newIndex === -1) {
+      stableTargetIndex = -1;
+      return;
+    }
+
+    const now = performance.now();
+    const timeSinceLastChange = now - lastIndexChangeTime;
+
+    let timeoutId: any = null;
+
+    if (timeSinceLastChange >= 3000) {
+      stableTargetIndex = newIndex;
+      lastIndexChangeTime = now;
+    } else {
+      const delay = 3000 - timeSinceLastChange;
+      timeoutId = setTimeout(() => {
+        stableTargetIndex = newIndex;
+        lastIndexChangeTime = performance.now();
+      }, delay);
+    }
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  });
+
+  let activeLineOffset = $derived.by(() => {
+    if (stableTargetIndex === -1 || !containerEl || !linesContainerEl) {
+      return containerHeight * 0.45;
+    }
+    const activeEl = linesContainerEl.querySelector(
+      `[data-index="${stableTargetIndex}"]`,
+    ) as HTMLElement;
+    if (!activeEl) return containerHeight * 0.45;
+
+    const activeOffsetTop = activeEl.offsetTop;
+    const activeHeight = activeEl.clientHeight;
+    return containerHeight * 0.45 - activeOffsetTop - activeHeight / 2;
+  });
+
+  let translateY = $derived.by(() => {
+    const rawY = activeLineOffset + userScrollOffset;
+    const minY = containerHeight * 0.45 - contentHeight;
+    const maxY = containerHeight * 0.45;
+    if (contentHeight > containerHeight) {
+      return Math.max(minY, Math.min(maxY, rawY));
+    }
+    return rawY;
+  });
+
+  function handleWheel(event: WheelEvent) {
+    event.preventDefault();
     isUserScrolling = true;
+
+    const minY = containerHeight * 0.45 - contentHeight;
+    const maxY = containerHeight * 0.45;
+
+    let targetOffset = userScrollOffset - event.deltaY;
+    const rawY = activeLineOffset + targetOffset;
+    if (rawY < minY) {
+      targetOffset = minY - activeLineOffset;
+    } else if (rawY > maxY) {
+      targetOffset = maxY - activeLineOffset;
+    }
+
+    userScrollOffset = targetOffset;
+
     clearTimeout(userScrollingTimeout);
     userScrollingTimeout = setTimeout(() => {
       isUserScrolling = false;
+      userScrollOffset = 0;
     }, 4000);
   }
 
-  function handleUserScroll() {
-    isUserScrolling = true;
-    isProgrammaticScrolling = false;
-    if (scrollAnimId) cancelAnimationFrame(scrollAnimId);
-    clearTimeout(userScrollingTimeout);
-    userScrollingTimeout = setTimeout(() => {
-      isUserScrolling = false;
-    }, 4000);
+  let isPointerDown = false;
+  let isDragging = false;
+  let startPointerY = 0;
+  let startScrollOffset = 0;
+
+  function handlePointerDown(event: PointerEvent) {
+    if (event.button !== 0) return;
+    isPointerDown = true;
+    isDragging = false;
+    startPointerY = event.clientY;
+    startScrollOffset = userScrollOffset;
+  }
+
+  function handlePointerMove(event: PointerEvent) {
+    if (!isPointerDown) return;
+    const deltaY = event.clientY - startPointerY;
+
+    if (!isDragging && Math.abs(deltaY) > 5) {
+      isDragging = true;
+      isUserScrolling = true;
+      clearTimeout(userScrollingTimeout);
+      containerEl?.setPointerCapture(event.pointerId);
+    }
+
+    if (isDragging) {
+      const minY = containerHeight * 0.45 - contentHeight;
+      const maxY = containerHeight * 0.45;
+
+      let targetOffset = startScrollOffset + deltaY;
+      const rawY = activeLineOffset + targetOffset;
+      if (rawY < minY) {
+        targetOffset = minY - activeLineOffset;
+      } else if (rawY > maxY) {
+        targetOffset = maxY - activeLineOffset;
+      }
+
+      userScrollOffset = targetOffset;
+    }
+  }
+
+  function handlePointerUp(event: PointerEvent) {
+    if (!isPointerDown) return;
+    isPointerDown = false;
+
+    if (isDragging) {
+      containerEl?.releasePointerCapture(event.pointerId);
+      isDragging = false;
+
+      clearTimeout(userScrollingTimeout);
+      userScrollingTimeout = setTimeout(() => {
+        isUserScrolling = false;
+        userScrollOffset = 0;
+      }, 4000);
+    }
   }
 
   function handleLineClick(line: LyricLine) {
     if (line.startTimeMs !== undefined) {
       player.seek(line.startTimeMs / 1000);
       isUserScrolling = false;
+      userScrollOffset = 0;
+      lastIndexChangeTime = 0;
     }
   }
 
@@ -380,7 +475,10 @@
   }
 </script>
 
-<div class="flex flex-col h-full w-full select-none overflow-hidden">
+<div
+  class="flex flex-col h-full w-full select-none overflow-hidden"
+  bind:clientHeight={containerHeight}
+>
   {#if loading}
     <div class="flex flex-col items-center justify-center flex-1 gap-3">
       <Spinner />
@@ -398,95 +496,151 @@
       </p>
     </div>
   {:else}
-    <!-- Scrollable container -->
+    <!-- Container with overflow-hidden or overflow-y-auto depending on sync status -->
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
       bind:this={containerEl}
-      onscroll={handleScroll}
-      onwheel={handleUserScroll}
-      ontouchmove={handleUserScroll}
-      class="flex-1 overflow-y-auto px-6 py-32 scrollbar-none flex flex-col gap-6"
+      onwheel={lyricsResult.synced ? handleWheel : null}
+      onpointerdown={lyricsResult.synced ? handlePointerDown : null}
+      onpointermove={lyricsResult.synced ? handlePointerMove : null}
+      onpointerup={lyricsResult.synced ? handlePointerUp : null}
+      class="flex-1 px-6 relative {lyricsResult.synced
+        ? 'overflow-hidden cursor-grab active:cursor-grabbing'
+        : 'overflow-y-auto scrollbar-none py-12'}"
+      style="--lyric-font-size: {player.lyricsFontSize === 'small'
+        ? '1.2rem'
+        : player.lyricsFontSize === 'large'
+          ? '1.8rem'
+          : '1.5rem'};"
     >
-      {#each lyricsResult.lines as line, index}
-        {@const isActive = isLineActive(line, adjustedTimeMs)}
-        {@const isPast =
-          lyricsResult.synced &&
-          line.endTimeMs !== undefined &&
-          line.endTimeMs <= adjustedTimeMs}
-        {@const distance =
-          isUserScrolling || scrollTargetIndex === -1
+      <div
+        bind:this={linesContainerEl}
+        bind:clientHeight={contentHeight}
+        class="flex flex-col gap-6 w-full select-none"
+      >
+        {#each lyricsResult.lines as line, index}
+          {@const isActive = isLineActive(line, adjustedTimeMs)}
+          {@const isPast =
+            lyricsResult.synced &&
+            line.endTimeMs !== undefined &&
+            line.endTimeMs <= adjustedTimeMs}
+          {@const distance =
+            isUserScrolling || stableTargetIndex === -1
+              ? 0
+              : Math.min(
+                  isExtended ? 20 : 3,
+                  Math.abs(index - stableTargetIndex),
+                )}
+          {@const viewportTopIndex = Math.max(0, stableTargetIndex - 4)}
+          {@const staggerDelay = isUserScrolling
             ? 0
-            : Math.min(3, Math.abs(index - scrollTargetIndex))}
-        {#if lyricsResult.synced && line.words}
-          <!-- svelte-ignore a11y_click_events_have_key_events -->
+            : Math.max(0, index - viewportTopIndex) * 50}
           <div
             data-index={index}
-            onclick={() => handleLineClick(line)}
-            class="lyric-line {isActive ? 'active' : isPast ? 'past' : ''}"
-            class:is-background={line.isBackground}
-            style="--distance: {distance};"
+            class={lyricsResult.synced ? "will-change-transform" : ""}
+            style={lyricsResult.synced
+              ? `transform: translateY(${translateY}px); transition: ${
+                  isUserScrolling
+                    ? "transform 0.2s cubic-bezier(0.33, 1, 0.68, 1);"
+                    : "transform 2s cubic-bezier(0.65, 0, 0.35, 1)"
+                }; transition-delay: ${staggerDelay}ms;`
+              : ""}
           >
-            {#each line.words as word, wIndex}
-              {@const progress = getWordProgress(word, isActive)}
-              {@const isWordActive = progress > 0 && progress < 1}
-              {@const isWordPast = progress >= 1}
-              {@const isTransition =
-                wIndex > 0 &&
-                word.isBackground !== line.words[wIndex - 1].isBackground}
-              {#if isTransition}
-                <div class="w-full h-2"></div>
-              {/if}
-              <span
-                class="word-wrapper {isWordPast
-                  ? 'past'
-                  : isWordActive
-                    ? 'active'
-                    : ''}"
-                class:is-background={word.isBackground}
+            {#if lyricsResult.synced && line.words}
+              <!-- svelte-ignore a11y_click_events_have_key_events -->
+              <div
+                onclick={() => handleLineClick(line)}
+                class="lyric-line {isActive ? 'active' : isPast ? 'past' : ''}"
+                class:is-background={line.isBackground}
+                class:is-extended={isExtended}
+                style="--distance: {distance};"
               >
-                <span
-                  class="word-span"
-                  style="--progress: {progress};"
-                  data-text={word.text}
-                >
-                  {word.text}
-                </span>
-              </span>
-            {/each}
-          </div>
-        {:else}
-          <!-- svelte-ignore a11y_click_events_have_key_events -->
-          <div
-            data-index={index}
-            onclick={() => handleLineClick(line)}
-            class="lyric-line {isActive ? 'active' : isPast ? 'past' : ''}"
-            class:is-background={line.isBackground}
-            class:is-instrumental={line.isInstrumental}
-            style="--distance: {distance};"
-          >
-            {#if line.isInstrumental}
-              <Music2Icon strokeWidth={4} />
+                <div class="main-line flex flex-wrap">
+                  {#each line.words as word, wIndex}
+                    {@const progress = getWordProgress(word, isActive)}
+                    {@const isWordActive = progress > 0 && progress < 1}
+                    {@const isWordPast = progress >= 1}
+                    {@const isTransition =
+                      wIndex > 0 &&
+                      word.isBackground !== line.words[wIndex - 1].isBackground}
+                    {#if isTransition}
+                      <div class="w-full h-2"></div>
+                    {/if}
+                    <span
+                      class="word-wrapper {isWordPast
+                        ? 'past'
+                        : isWordActive
+                          ? 'active'
+                          : ''}"
+                      class:is-background={word.isBackground}
+                    >
+                      <span
+                        class="word-span"
+                        style="--progress: {progress};"
+                        data-text={word.text}
+                      >
+                        {word.text}
+                      </span>
+                    </span>
+                  {/each}
+                </div>
+                {#if line.romanizedText}
+                  <div
+                    class="romanized-line text-muted-foreground/60 text-[0.6em] font-normal leading-normal mt-1 select-none"
+                  >
+                    {line.romanizedText}
+                  </div>
+                {/if}
+              </div>
             {:else}
-              {line.text}
+              <!-- svelte-ignore a11y_click_events_have_key_events -->
+              <div
+                onclick={() => handleLineClick(line)}
+                class="lyric-line {isActive ? 'active' : isPast ? 'past' : ''}"
+                class:is-background={line.isBackground}
+                class:is-instrumental={line.isInstrumental}
+                class:is-extended={isExtended}
+                style="--distance: {distance};"
+              >
+                {#if line.isInstrumental}
+                  <Music2Icon
+                    strokeWidth={4}
+                    class={isExtended ? "size-[2vw]" : ""}
+                  />
+                {:else}
+                  <div class="main-line">
+                    {line.text}
+                  </div>
+                  {#if line.romanizedText}
+                    <div
+                      class="romanized-line text-muted-foreground/60 text-[0.6em] font-normal leading-normal mt-1 select-none"
+                    >
+                      {line.romanizedText}
+                    </div>
+                  {/if}
+                {/if}
+              </div>
             {/if}
           </div>
-        {/if}
-      {/each}
+        {/each}
+      </div>
     </div>
 
     <!-- Source footer info -->
-    <div
-      class="p-3 border-t border-border/40 bg-background/25 backdrop-blur-md flex items-center justify-between text-[10px] text-muted-foreground/50"
-    >
-      <span
-        >Sync: {lyricsResult.synced
-          ? lyricsResult.wordSynced
-            ? "Word-by-word"
-            : "Line-by-line"
-          : "Unsynced"}</span
+    {#if showInfo}
+      <div
+        class="p-3 border-t border-border/40 bg-background/25 backdrop-blur-md flex items-center justify-between text-[10px] text-muted-foreground/50"
       >
-      <span>Source: {lyricsResult.source}</span>
-    </div>
+        <span
+          >Sync: {lyricsResult.synced
+            ? lyricsResult.wordSynced
+              ? "Word-by-word"
+              : "Line-by-line"
+            : "Unsynced"}</span
+        >
+        <span>Source: {lyricsResult.source}</span>
+      </div>
+    {/if}
   {/if}
 </div>
 
@@ -526,22 +680,22 @@
     word-break: break-word;
     transform: scale(0.95);
     display: flex;
-    flex-flow: row wrap;
-    align-items: start;
+    flex-flow: column nowrap;
+    align-items: flex-start;
     align-content: flex-start;
     font-weight: 600;
     text-align: left;
     line-height: 1.333;
-    font-size: 1.5rem;
+    font-size: var(--lyric-font-size, 1.5rem);
 
     /* Progressive blur and opacity based on distance from active index */
     --blur-amount: calc(var(--distance, 0) * 0.5px);
     --opacity-amount: calc(1 - var(--distance, 0) * 0.1);
     opacity: max(0.15, var(--opacity-amount));
-    filter: blur(var(--blur-amount));
+    /* filter: blur(var(--blur-amount)); */
 
     transition:
-      transform 0.25s ease,
+      transform 0.4s ease,
       opacity 0.4s ease,
       filter 0.4s ease;
   }
@@ -549,15 +703,26 @@
   .lyric-line.active {
     transform: scale(1.03);
     opacity: 1;
-    filter: blur(0px) drop-shadow(0 0 0.8rem rgba(255, 255, 255, 0.3));
+    filter: drop-shadow(0 0 0.8rem rgba(255, 255, 255, 0.3));
     transition:
       transform 0.25s ease,
       opacity 0.25s ease,
       filter 0.25s ease;
   }
 
+  .lyric-line.is-extended {
+    transform: scale(0.95) translateX(calc(var(--distance, 0) * -10px + 3rem));
+    margin-left: 50%;
+    width: 45%;
+    font-size: 2.5vw;
+    transition:
+      transform 1.5s ease,
+      opacity 0.4s ease,
+      filter 0.4s ease;
+  }
+
   .word-wrapper {
-    transform: translateZ(0) translateX(0);
+    transform: translateZ(0);
     backface-visibility: hidden;
     display: inline-block;
     transform-origin: left center;
@@ -583,14 +748,14 @@
     position: relative;
     display: inline-block;
     color: rgba(255, 255, 255, 0.25);
-    white-space: pre;
+    white-space: pre-wrap;
     transform-origin: left center;
     animation: blyrics-glow 2s forwards ease;
     animation-play-state: paused;
   }
 
   .word-wrapper.active .word-span {
-    color: transparent;
+    color: #ffffff;
     background: linear-gradient(
       to right,
       #ffffff calc(var(--progress, 0) * 100% - 8px),
@@ -611,6 +776,10 @@
     opacity: calc(max(0.15, var(--opacity-amount)) * 0.6);
   }
 
+  .lyric-line.is-extended.is-background {
+    font-size: 2vw;
+  }
+
   .lyric-line.is-background.active {
     opacity: 0.65;
   }
@@ -620,10 +789,16 @@
     opacity: 0.7;
   }
 
+  .lyric-line.is-extended .word-wrapper.is-background {
+    font-size: 2vw;
+  }
+
   .lyric-line.is-instrumental {
     opacity: calc(max(0.15, var(--opacity-amount)) * 0.2);
-    font-size: 1.25rem;
-    font-style: italic;
+  }
+
+  .lyric-line.is-instrumental.past {
+    opacity: calc(max(0.15, var(--opacity-amount)) * 0.8);
   }
 
   .lyric-line.is-instrumental.active {

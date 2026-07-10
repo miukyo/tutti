@@ -90,9 +90,7 @@
 
   onMount(async () => {
     await checkAuth();
-    if (isAuthed) {
-      await fetchLibraryData();
-    } else {
+    if (!isAuthed) {
       loading = false;
     }
   });

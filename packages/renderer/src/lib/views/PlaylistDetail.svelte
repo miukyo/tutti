@@ -34,7 +34,7 @@
     }
   });
 
-  function getQueue(): Track[] {
+  let queue = $derived.by(() => {
     return videos.map((v) => ({
       videoId: v.videoId,
       name: v.name,
@@ -43,10 +43,9 @@
       thumbnail: v.thumbnails?.at(0)?.url || "",
       duration: v.duration,
     }));
-  }
+  });
 
   function playPlaylist() {
-    const queue = getQueue();
     if (queue.length > 0) {
       player.playTrack(queue[0], queue);
     }
@@ -104,7 +103,7 @@
       </div>
 
       <div class="w-full">
-        <SongTable songs={getQueue()} />
+        <SongTable songs={queue} />
       </div>
     {:else}
       <div class="flex items-center justify-center h-64">

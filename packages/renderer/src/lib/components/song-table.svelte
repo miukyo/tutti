@@ -61,6 +61,8 @@
                 <Image
                   src={song.thumbnail}
                   alt={song.name}
+                  width={40}
+                  height={40}
                   class="size-full object-cover"
                 />
               </div>

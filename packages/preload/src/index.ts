@@ -1,5 +1,5 @@
 import { sha256sum } from './nodeCrypto.js';
-import { versions } from './versions.js';
+import { versions, platform } from './versions.js';
 import { ipcRenderer } from 'electron';
 import type { YTMusic } from '@app/api';
 
@@ -75,4 +75,4 @@ const ytmusic = ytmusicObj as {
   [K in typeof ytmusicMethods[number]]: YTMusic[K];
 };
 
-export { sha256sum, versions, send, ytmusic };
+export { sha256sum, versions, platform, send, ytmusic };

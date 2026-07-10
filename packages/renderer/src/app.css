@@ -102,7 +102,7 @@
 
 .shadow-glass {
 	position: relative;
-	box-shadow: var(--shadow-glass);
+	/* Removed external drop shadow variable */
 }
 
 .shadow-glass::after {
@@ -111,6 +111,7 @@
 	inset: 0;
 	pointer-events: none;
 	border-radius: inherit;
+	/* Pure white inner glow shadows */
 	box-shadow:
 		inset 0 1px 0 0 rgba(255, 255, 255, 0.15),
 		inset 0 -1px 0 0 rgba(255, 255, 255, 0.1),
@@ -120,13 +121,11 @@
 	z-index: 1;
 }
 
-.shadow-glass-hover:hover,
-.hover\:shadow-glass-hover:hover {
-	box-shadow: var(--shadow-glass-hover);
-}
+/* Removed external hover shadow rules */
 
 .shadow-glass-hover:hover::after,
 .hover\:shadow-glass-hover:hover::after {
+	/* Amplified white inner glow on hover */
 	box-shadow:
 		inset 0 1px 0 0 rgba(255, 255, 255, 0.35),
 		inset 0 -1px 0 0 rgba(255, 255, 255, 0.2),
@@ -135,4 +134,8 @@
 
 [data-slot="button"].active {
 	@apply bg-primary text-primary-foreground shadow-glass hover:shadow-glass-hover;
+}
+
+* {
+	user-select: none;
 }

@@ -307,6 +307,7 @@ export interface LyricLine {
   isBackground?: boolean;
   isInstrumental?: boolean;
   isFaked?: boolean;
+  romanizedText?: string;
 }
 
 export interface LyricResult {

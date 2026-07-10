@@ -15,6 +15,22 @@
 
   let currentTrack = $derived(player.currentTrack);
 
+  let playableQueue = $derived(
+    items
+      .filter(
+        (item): item is Extract<SearchResult, { type: "SONG" | "VIDEO" }> =>
+          item.type === "SONG" || item.type === "VIDEO",
+      )
+      .map((item) => ({
+        videoId: item.videoId,
+        name: item.name,
+        artist: item.artist?.name || "Unknown Artist",
+        artistId: item.artist?.artistId,
+        thumbnail: item.thumbnails?.at(0)?.url || "",
+        duration: item.duration,
+      }))
+  );
+
   function playItem(item: Extract<SearchResult, { type: "SONG" | "VIDEO" }>) {
     const track: Track = {
       videoId: item.videoId,
@@ -27,24 +43,8 @@
     if (playWithUpNext) {
       player.playWithUpNext(track);
     } else {
-      player.playTrack(track, getQueue());
+      player.playTrack(track, playableQueue);
     }
-  }
-
-  function getQueue(): Track[] {
-    return items
-      .filter(
-        (item): item is Extract<SearchResult, { type: "SONG" | "VIDEO" }> =>
-          item.type === "SONG" || item.type === "VIDEO",
-      )
-      .map((item) => ({
-        videoId: item.videoId,
-        name: item.name,
-        artist: item.artist?.name || "Unknown Artist",
-        artistId: item.artist?.artistId,
-        thumbnail: item.thumbnails?.at(0)?.url || "",
-        duration: item.duration,
-      }));
   }
 
   function getItemHref(item: SearchResult): string | undefined {

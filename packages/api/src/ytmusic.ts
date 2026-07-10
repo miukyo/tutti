@@ -10,6 +10,7 @@ import * as artistParser from './parsers/artistParser.js';
 import * as playlistParser from './parsers/playlistParser.js';
 import * as albumParser from './parsers/albumParser.js';
 import * as streamParser from './parsers/streamParser.js';
+import { parseLrc, parseTtml, parseLyricsPlus } from './parsers/lyricsParser.js';
 import {
   Thumbnail,
   ArtistBasic,
@@ -84,27 +85,32 @@ const lyricsCachedFetch = NodeFetchCache.create({
   }
 });
 
-function shouldCacheYTRequest(endpoint: string, body: any): boolean {
+function shouldCacheYTRequest(endpoint: string, body: any, urlStr: string = ''): boolean {
   // 1. Search
   if (endpoint === 'search' || endpoint === 'music/get_search_suggestions') {
     return true;
   }
-  
+
   // 2. Lyrics / Recommendations
   if (endpoint === 'next') {
     return true;
   }
-  
+
   // 3. Browse (Home, Explore, Artists, Albums, Playlists)
   if (endpoint === 'browse') {
-    const browseId = body?.browseId || '';
+    let browseId = body?.browseId || '';
+    if (!browseId && urlStr) {
+      const match = /[?&]browseId=([^&]+)/.exec(urlStr);
+      if (match) {
+        browseId = decodeURIComponent(match[1]);
+      }
+    }
     if (!browseId) return false;
-    
     // Home
     if (browseId === Constants.FeMusicHome) {
       return true;
     }
-    
+
     // Explore
     if (
       browseId === Constants.FeMusicExplore ||
@@ -113,22 +119,22 @@ function shouldCacheYTRequest(endpoint: string, body: any): boolean {
     ) {
       return true;
     }
-    
+
     // Lyrics text
     if (browseId.startsWith('FEmusic_lyrics')) {
       return true;
     }
-    
+
     // Artists (starts with UC)
     if (browseId.startsWith('UC')) {
       return true;
     }
-    
+
     // Albums (starts with MPREb_ or OLAK5uy_)
     if (browseId.startsWith('MPREb_') || browseId.startsWith('OLAK5uy_')) {
       return true;
     }
-    
+
     // Playlists
     // Exclude Liked Songs (LM) and Saved Episodes (SE)
     // Exclude user-specific library playlists in userPlaylistIds
@@ -143,18 +149,18 @@ function shouldCacheYTRequest(endpoint: string, body: any): boolean {
       return true;
     }
   }
-  
+
   return false;
 }
 
 const fetch = async (url: any, init?: any): Promise<any> => {
   const urlStr = typeof url === 'string' ? url : (url as any).url || '';
-  
+
   // Check if it's Unison or LRCLib lyrics
   if (urlStr.includes('unison.boidu.dev') || urlStr.includes('lrclib.net')) {
     return lyricsCachedFetch(url, init);
   }
-  
+
   // For YouTube Music requests (POST requests)
   if (init?.method === 'POST' && urlStr.includes('/youtubei/')) {
     const match = /\/youtubei\/v[0-9]+\/([^?]+)/.exec(urlStr);
@@ -163,20 +169,20 @@ const fetch = async (url: any, init?: any): Promise<any> => {
       let body: any = {};
       try {
         body = typeof init.body === 'string' ? JSON.parse(init.body) : init.body || {};
-      } catch {}
-      
+      } catch { }
+
       const browseId = body?.browseId || '';
       if (endpoint === 'browse' && browseId.startsWith('FEmusic_lyrics')) {
         return lyricsCachedFetch(url, init);
       }
-      
-      if (shouldCacheYTRequest(endpoint, body)) {
+
+      if (shouldCacheYTRequest(endpoint, body, urlStr)) {
         return cachedFetch(url, init);
       }
     }
     return globalThis.fetch(url, init);
   }
-  
+
   // Fallback: bypass cache
   return globalThis.fetch(url, init);
 };
@@ -214,231 +220,7 @@ function getOrCreateKeyId(): string {
   return unisonKeyId;
 }
 
-function parseTime(timeStr: string): number {
-  if (!timeStr) return 0;
-  timeStr = timeStr.trim();
-  
-  const offsetMatch = timeStr.match(/^([\d.]+)(h|m|s|ms)$/);
-  if (offsetMatch) {
-    const value = parseFloat(offsetMatch[1]);
-    const unit = offsetMatch[2];
-    if (unit === 'h') return Math.round(value * 3600 * 1000);
-    if (unit === 'm') return Math.round(value * 60 * 1000);
-    if (unit === 's') return Math.round(value * 1000);
-    if (unit === 'ms') return Math.round(value);
-  }
 
-  const parts = timeStr.split(':');
-  let totalMs = 0;
-  if (parts.length === 1) {
-    totalMs = parseFloat(parts[0]) * 1000;
-  } else if (parts.length === 2) {
-    totalMs = parseInt(parts[0], 10) * 60 * 1000 + parseFloat(parts[1]) * 1000;
-  } else if (parts.length === 3) {
-    totalMs = parseInt(parts[0], 10) * 3600 * 1000 + parseInt(parts[1], 10) * 60 * 1000 + parseFloat(parts[2]) * 1000;
-  }
-  return Math.round(totalMs);
-}
-
-function parseLrc(lrcText: string): LyricLine[] {
-  const lines = lrcText.split('\n');
-  const result: LyricLine[] = [];
-  const timeRegex = /\[(\d+):(\d+)(?:\.(\d+))?\]/g;
-  const wordRegex = /<(\d+):(\d+)(?:\.(\d+))?>/g;
-
-  for (let line of lines) {
-    line = line.trim();
-    if (!line) continue;
-
-    timeRegex.lastIndex = 0;
-    const matches: { time: number; matchStr: string }[] = [];
-    let match;
-    while ((match = timeRegex.exec(line)) !== null) {
-      const minutes = parseInt(match[1], 10);
-      const seconds = parseInt(match[2], 10);
-      const msStr = match[3] || '0';
-      const ms = parseInt(msStr.padEnd(3, '0').substring(0, 3), 10);
-      const timeMs = minutes * 60 * 1000 + seconds * 1000 + ms;
-      matches.push({ time: timeMs, matchStr: match[0] });
-    }
-
-    if (matches.length === 0) continue;
-
-    let rawText = line;
-    for (const m of matches) {
-      rawText = rawText.replace(m.matchStr, '');
-    }
-    rawText = rawText.trim();
-
-    const words: LyricWord[] = [];
-    if (rawText.includes('<')) {
-      const wordParts = rawText.split(/(<\d+:\d+(?:\.\d+)?>)/);
-      let currentWordTime = matches[0].time;
-      
-      for (let i = 0; i < wordParts.length; i++) {
-        const part = wordParts[i];
-        if (!part) continue;
-
-        if (part.startsWith('<') && part.endsWith('>')) {
-          wordRegex.lastIndex = 0;
-          const wMatch = wordRegex.exec(part);
-          if (wMatch) {
-            const minutes = parseInt(wMatch[1], 10);
-            const seconds = parseInt(wMatch[2], 10);
-            const msStr = wMatch[3] || '0';
-            const ms = parseInt(msStr.padEnd(3, '0').substring(0, 3), 10);
-            currentWordTime = minutes * 60 * 1000 + seconds * 1000 + ms;
-          }
-        } else {
-          const subWords = part.match(/\S+\s*/g) || [];
-          for (const sw of subWords) {
-            words.push({
-              startTimeMs: currentWordTime,
-              text: sw
-            });
-          }
-        }
-      }
-    }
-
-    const cleanText = rawText.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
-
-    for (const m of matches) {
-      result.push({
-        startTimeMs: m.time,
-        text: cleanText,
-        words: words.length > 0 ? words : undefined
-      });
-    }
-  }
-
-  return result.sort((a, b) => (a.startTimeMs || 0) - (b.startTimeMs || 0));
-}
-
-function parseTtml(ttmlText: string): LyricLine[] {
-  const result: LyricLine[] = [];
-  const pRegex = /<p\b[^>]*?begin="([^"]+)"[^>]*?>(.*?)<\/p>/gi;
-  let match;
-  while ((match = pRegex.exec(ttmlText)) !== null) {
-    const beginTimeStr = match[1];
-    const pContent = match[2];
-    const timeMs = parseTime(beginTimeStr);
-
-    const pTag = match[0].substring(0, match[0].indexOf('>') + 1);
-    const isLineBg = pTag.includes('role="x-bg"');
-
-    const cleanText = pContent.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
-    if (!cleanText) continue;
-
-    const words: LyricWord[] = [];
-    const tokenRegex = /(<[^>]+>)|([^<]+)/gi;
-    let tokenMatch;
-
-    interface SpanState {
-      begin: string | null;
-      end: string | null;
-      dur: string | null;
-      isBg: boolean;
-    }
-    const spanStack: SpanState[] = [];
-
-    while ((tokenMatch = tokenRegex.exec(pContent)) !== null) {
-      if (tokenMatch[1]) {
-        const tag = tokenMatch[1];
-        if (tag.toLowerCase().startsWith('<span')) {
-          const beginMatch = /begin="([^"]+)"/i.exec(tag);
-          const endMatch = /end="([^"]+)"/i.exec(tag);
-          const durMatch = /dur="([^"]+)"/i.exec(tag);
-          const isBg = /role=["']x-bg["']/i.test(tag);
-          spanStack.push({
-            begin: beginMatch ? beginMatch[1] : null,
-            end: endMatch ? endMatch[1] : null,
-            dur: durMatch ? durMatch[1] : null,
-            isBg
-          });
-        } else if (tag.toLowerCase() === '</span>') {
-          spanStack.pop();
-        }
-      } else if (tokenMatch[2]) {
-        const text = tokenMatch[2];
-        
-        let currentBegin: string | null = null;
-        let currentEnd: string | null = null;
-        let currentDur: string | null = null;
-        for (let idx = spanStack.length - 1; idx >= 0; idx--) {
-          if (spanStack[idx].begin) {
-            currentBegin = spanStack[idx].begin;
-            currentEnd = spanStack[idx].end;
-            currentDur = spanStack[idx].dur;
-            break;
-          }
-        }
-        const isSpanBg = spanStack.some(s => s.isBg);
-
-        if (currentBegin) {
-          const startMs = parseTime(currentBegin);
-          let durationMs: number | undefined = undefined;
-          if (currentEnd) {
-            durationMs = parseTime(currentEnd) - startMs;
-          } else if (currentDur) {
-            durationMs = parseTime(currentDur);
-          }
-
-          words.push({
-            startTimeMs: startMs,
-            durationMs,
-            text: text,
-            isBackground: isSpanBg || isLineBg
-          });
-        } else {
-          if (words.length > 0) {
-            words[words.length - 1].text += text;
-          } else {
-            words.push({
-              startTimeMs: timeMs,
-              text: text,
-              isBackground: isSpanBg || isLineBg
-            });
-          }
-        }
-      }
-    }
-
-    // Normalize spacing on parsed words
-    const cleanWords = words
-      .map(w => ({ ...w, text: w.text }))
-      .filter(w => w.text.trim() !== '');
-
-    for (let j = 0; j < cleanWords.length; j++) {
-      const current = cleanWords[j].text;
-      const hasLeading = /^\s/.test(current);
-      const hasTrailing = /\s$/.test(current);
-
-      cleanWords[j].text = current.trim();
-
-      if (hasLeading && j > 0) {
-        const prev = cleanWords[j - 1];
-        if (!prev.text.endsWith(' ')) {
-          prev.text += ' ';
-        }
-      }
-
-      if (hasTrailing && j < cleanWords.length - 1) {
-        if (!cleanWords[j].text.endsWith(' ')) {
-          cleanWords[j].text += ' ';
-        }
-      }
-    }
-
-    result.push({
-      startTimeMs: timeMs,
-      text: cleanWords.length > 0 ? cleanWords.map(w => w.text).join('') : cleanText,
-      words: cleanWords.length > 0 ? cleanWords : undefined,
-      isBackground: isLineBg
-    });
-  }
-  return result.sort((a, b) => (a.startTimeMs || 0) - (b.startTimeMs || 0));
-}
 
 export class YTMusic {
   private cookieString: string = '';
@@ -654,7 +436,8 @@ export class YTMusic {
       'Content-Type': 'application/json',
       'Origin': 'https://music.youtube.com',
       'X-Goog-Visitor-Id': this.getConfigString('VISITOR_DATA'),
-      'Cookie': this.cookieString
+      'Cookie': this.cookieString,
+      'X-Goog-AuthUser': this.authUser,
     };
 
     if (!defaultClient) {
@@ -1051,6 +834,8 @@ export class YTMusic {
       }
     }
 
+
+
     // 1. Try Unison
     try {
       const keyId = getOrCreateKeyId();
@@ -1087,7 +872,34 @@ export class YTMusic {
       console.warn("Unison lyrics fetch failed:", e);
     }
 
-    // 2. Try LRCLib
+    // 2. Try LyricsPlus (binimum)
+    if (songTitle && songArtist) {
+      try {
+        const url = new URL('https://lyricsplus.binimum.org/v2/lyrics/get');
+        url.searchParams.append('title', songTitle);
+        url.searchParams.append('artist', songArtist);
+        if (songDuration) {
+          url.searchParams.append('duration', String(Math.round(songDuration)));
+        }
+
+        const response = await fetch(url.toString());
+        if (response.ok) {
+          const json = await response.json() as any;
+          if (json) {
+            const lines = parseLyricsPlus(json);
+            if (lines && lines.length > 0) {
+              const sourceLabel = json.metadata?.source || json.metadata?.provider || 'LyricsPlus';
+              const isUnsynced = lines.every((line) => !line.startTimeMs && !line.endTimeMs);
+              return { synced: !isUnsynced, lines, source: sourceLabel };
+            }
+          }
+        }
+      } catch (e) {
+        console.warn("LyricsPlus lyrics fetch failed:", e);
+      }
+    }
+
+    // 3. Try LRCLib
     if (songTitle && songArtist) {
       try {
         const lrcUrl = new URL('https://lrclib.net/api/get');
@@ -1116,7 +928,7 @@ export class YTMusic {
       }
     }
 
-    // 3. Fallback to YouTube Music plain text scraper
+    // 4. Fallback to YouTube Music plain text scraper
     try {
       const data = await this.constructRequest('next', { videoId });
       const tabs = traverseList(data, 'tabs', 'tabRenderer');
@@ -1166,7 +978,8 @@ export class YTMusic {
     let moreSongsData: any = null;
     if (continueToken) {
       moreSongsData = await this.constructRequest('browse', {}, {
-        continuation: continueToken
+        continuation: continueToken,
+        browseId: browseToken
       });
     }
 
@@ -1369,7 +1182,8 @@ export class YTMusic {
     let continuation = traverseString(data, 'continuation');
     while (continuation) {
       const contData = await this.constructRequest('browse', {}, {
-        continuation
+        continuation,
+        browseId: Constants.FeMusicHome
       });
 
       sections.push(...traverseList(contData, 'sectionListContinuation', 'contents'));
