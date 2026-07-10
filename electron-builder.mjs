@@ -9,6 +9,11 @@ export default /** @type import('electron-builder').Configuration */
     output: 'dist',
     buildResources: 'buildResources',
   },
+  publish: {
+    provider: 'github',
+    owner: 'miukyo',
+    repo: 'tutti',
+  },
   generateUpdatesFilesForAllChannels: true,
   linux: {
     target: ['deb'],

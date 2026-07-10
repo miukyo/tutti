@@ -28,7 +28,13 @@
     CaseSensitiveIcon,
     GaugeIcon,
   } from "@lucide/svelte/icons";
-  import { ytmusic, versions, platform } from "@app/preload";
+  import {
+    ytmusic,
+    versions,
+    platform,
+    checkForUpdates,
+    getAppVersion,
+  } from "@app/preload";
   import { Button } from "$lib/components/ui/button";
   import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
   import Home from "$lib/views/Home.svelte";
@@ -57,9 +63,44 @@
 
   let accountInfo = $state<AccountInfo | null>(null);
   let sidebarPlaylists = $state<PlaylistDetailed[]>([]);
+  let appVersion = $state("1.0.0");
+
+  let updateStatus = $state<
+    "idle" | "checking" | "available" | "not-available" | "error"
+  >("idle");
+  let updateVersion = $state<string | null>(null);
+  let updateErrorMessage = $state<string | null>(null);
+
+  async function handleCheckForUpdates() {
+    updateStatus = "checking";
+    updateVersion = null;
+    updateErrorMessage = null;
+    try {
+      const res = await checkForUpdates();
+      if (res.status === "available") {
+        updateStatus = "available";
+        updateVersion = res.version || null;
+      } else if (res.status === "not-available") {
+        updateStatus = "not-available";
+        updateVersion = res.version || null;
+      } else {
+        updateStatus = "error";
+        updateErrorMessage =
+          res.message || "An error occurred while checking for updates.";
+      }
+    } catch (err: any) {
+      updateStatus = "error";
+      updateErrorMessage = err?.message || "Failed to check for updates.";
+    }
+  }
 
   onMount(async () => {
     player.init();
+    try {
+      appVersion = await getAppVersion();
+    } catch (e) {
+      console.warn("Failed to get app version:", e);
+    }
     try {
       const info = await ytmusic.getAccountInfo();
       if (info && info.accountName) {
@@ -384,7 +425,12 @@
 
                   <!-- About Tutti -->
                   <DropdownMenu.Item
-                    onclick={() => (showAboutModal = true)}
+                    onclick={() => {
+                      updateStatus = "idle";
+                      updateVersion = null;
+                      updateErrorMessage = null;
+                      showAboutModal = true;
+                    }}
                     class="flex items-center gap-2 rounded-2xl px-3 py-2 text-sm font-medium hover:bg-accent cursor-pointer"
                   >
                     <InfoIcon class="size-4" />
@@ -540,17 +586,62 @@
         <div
           class="flex flex-col gap-1 text-xs text-muted-foreground border-t border-border/50 pt-3"
         >
-          <div>Version: 1.0.0</div>
+          <div>Version: {appVersion}</div>
           <div>Electron: {versions.electron || "N/A"}</div>
           <div>Chrome: {versions.chrome || "N/A"}</div>
           <div>Node: {versions.node || "N/A"}</div>
+        </div>
+
+        <div class="border-t border-border/50 pt-3 flex flex-col gap-0">
+          {#if updateStatus === "idle"}
+            <Button
+              variant="outline"
+              size="sm"
+              onclick={handleCheckForUpdates}
+              class="w-full rounded-2xl"
+            >
+              Check for Updates
+            </Button>
+          {:else if updateStatus === "checking"}
+            <div
+              class="flex items-center justify-center gap-2 py-1 text-xs text-muted-foreground"
+            >
+              <span
+                class="animate-spin size-3.5 border-2 border-primary border-t-transparent rounded-full"
+              ></span>
+              Checking for updates...
+            </div>
+          {:else if updateStatus === "available"}
+            <div class="text-xs text-center text-emerald-500 font-semibold">
+              New version {updateVersion || ""} is available!
+            </div>
+            <p class="text-[10px] text-center text-muted-foreground/80">
+              Downloading in background...
+            </p>
+          {:else if updateStatus === "not-available"}
+            <div class="text-xs text-center text-muted-foreground">
+              You are up to date!
+            </div>
+          {:else if updateStatus === "error"}
+            <div class="text-xs text-center text-destructive font-medium">
+              {updateErrorMessage || "Failed to check for updates"}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onclick={handleCheckForUpdates}
+              class="w-full rounded-2xl mt-1"
+            >
+              Retry
+            </Button>
+          {/if}
         </div>
 
         <Button
           variant="outline"
           size="sm"
           onclick={() => (showAboutModal = false)}
-          class="w-full mt-2 rounded-2xl"
+          class="w-full rounded-2xl"
         >
           Close
         </Button>

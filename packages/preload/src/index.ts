@@ -75,4 +75,12 @@ const ytmusic = ytmusicObj as {
   [K in typeof ytmusicMethods[number]]: YTMusic[K];
 };
 
-export { sha256sum, versions, platform, send, ytmusic };
+function checkForUpdates(): Promise<{ status: 'available' | 'not-available' | 'error'; version?: string; message?: string }> {
+  return ipcRenderer.invoke('check-for-updates');
+}
+
+function getAppVersion(): Promise<string> {
+  return ipcRenderer.invoke('get-app-version');
+}
+
+export { sha256sum, versions, platform, send, ytmusic, checkForUpdates, getAppVersion };

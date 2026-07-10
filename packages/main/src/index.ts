@@ -1,4 +1,4 @@
-import { app } from 'electron';
+import { app, ipcMain } from 'electron';
 import type { AppInitConfig } from './AppInitConfig.js';
 import { disallowMultipleAppInstance } from './modules/SingleInstanceApp.js';
 import { createWindowManagerModule } from './modules/WindowManager.js';
@@ -17,6 +17,8 @@ export async function initApp(initConfig: AppInitConfig) {
   }
   // Expose garbage collection globally in Node and Chromium
   app.commandLine.appendSwitch('js-flags', '--expose-gc');
+
+  ipcMain.handle('get-app-version', () => app.getVersion());
 
   const modules = [
     disallowMultipleAppInstance(),

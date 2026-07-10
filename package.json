@@ -10,6 +10,10 @@
     "url": "https://miukyo.my.id"
   },
   "main": "packages/entry-point.mjs",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/miukyo/tutti.git"
+  },
   "workspaces": [
     "packages/*"
   ],
