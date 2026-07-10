@@ -11,9 +11,9 @@
   },
   "devDependencies": {
     "@app/api": "*",
-    "@fontsource-variable/google-sans-flex": "^5.2.3",
+    "@fontsource-variable/inter-tight": "^5.2.7",
     "@internationalized/date": "^3.12.2",
-    "@lucide/svelte": "^1.23.0",
+    "@lucide/svelte": "^1.24.0",
     "@sveltejs/vite-plugin-svelte": "^7.0.0",
     "@tailwindcss/vite": "^4.3.2",
     "@tsconfig/svelte": "^5.0.8",
@@ -37,6 +37,5 @@
     ".": {
       "default": "./dist/index.html"
     }
-  },
-  "dependencies": {}
+  }
 }

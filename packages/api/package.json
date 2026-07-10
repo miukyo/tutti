@@ -17,6 +17,7 @@
     "typescript": "6.0.2"
   },
   "dependencies": {
+    "lyric-romanizer": "^0.2.0",
     "node-fetch-cache": "^5.1.0"
   }
 }

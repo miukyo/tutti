@@ -18,6 +18,7 @@
   import { player } from "$lib/stores/player.svelte";
   import Image from "./ui/image.svelte";
   import { Spinner } from "$lib/components/ui/spinner";
+  import Glow from "./ui/glow.svelte";
 
   function formatTime(seconds: number): string {
     if (isNaN(seconds)) return "0:00";
@@ -149,32 +150,32 @@
       <div
         class="absolute w-1/3 h-full top-0 left-1/2 -translate-x-1/2 py-2 flex flex-col justify-center"
       >
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div
-          class="w-full flex items-center justify-between gap-2 bg-foreground/5 pl-1.5 pr-3 h-14 rounded-2xl border border-border/50"
+          class="w-full flex items-center justify-between gap-2 bg-foreground/5 pl-1.5 pr-3 h-14 rounded-2xl border border-border/50 cursor-pointer group relative overflow-hidden shadow-glass"
+          onclick={() => currentTrack && (player.showExtended = true)}
         >
+          <Glow />
+
           {#if currentTrack}
-            <!-- svelte-ignore a11y_click_events_have_key_events -->
-            <!-- svelte-ignore a11y_no_static_element_interactions -->
-            <div
-              class="flex gap-2 items-center min-w-0 cursor-pointer group"
-              onclick={() => (player.showExtended = true)}
-              title="Expand player view"
-            >
+            <div class="flex gap-2 items-center min-w-0">
               <Image
                 src={currentTrack.thumbnail}
                 alt={currentTrack.name}
                 width={36}
                 height={36}
-                class="size-10 bg-background rounded-lg object-cover group-hover:scale-105 transition-transform"
+                class="size-10 bg-background rounded-lg object-cover"
+                style="view-transition-name: player-thumbnail;"
               />
               <div class="min-w-0">
                 <p
-                  class="text-xs font-semibold truncate leading-tight group-hover:text-primary transition-colors"
+                  class="text-xs font-semibold truncate leading-tight group-hover:text-primary"
                 >
                   {currentTrack.name}
                 </p>
                 <p
-                  class="text-[10px] text-muted-foreground truncate leading-tight"
+                  class="text-[10px] text-muted-foreground truncate leading-tight group-hover:text-primary"
                 >
                   {currentTrack.artist}
                 </p>

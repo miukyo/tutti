@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { fade, fly } from "svelte/transition";
   import {
     ChevronDownIcon,
     FastForwardIcon,
@@ -16,15 +15,15 @@
   import Lyrics from "$lib/components/lyrics.svelte";
   import Image from "./ui/image.svelte";
   import PlayerBar from "./player-bar.svelte";
+  import * as Select from "./ui/select";
+  import Glow from "./ui/glow.svelte";
 
   let showExtended = $derived(player.showExtended);
   let currentTrack = $derived(player.currentTrack);
-
 </script>
 
 {#if showExtended && currentTrack}
   <div
-    transition:fade={{ duration: 400 }}
     class="fixed inset-0 z-150 bg-background/95 backdrop-blur-3xl overflow-hidden flex flex-col"
   >
     <!-- Ambient blurred background -->
@@ -42,12 +41,11 @@
       width={1024}
       height={1024}
       class="h-full left-0 absolute -z-10 mask-radial-from-0% mask-radial-at-left aspect-square object-cover mask-radial-[100%_200%] opacity-90"
+      style="view-transition-name: player-thumbnail;"
     />
 
     <!-- Top bar -->
-    <header
-      class="absolute w-full flex items-center justify-between px-8 py-6 z-200"
-    >
+    <header class="absolute w-full flex items-center gap-2 px-8 py-6 z-200">
       <Button
         size="icon"
         variant="outline-blur"
@@ -55,6 +53,28 @@
       >
         <ChevronDownIcon class="size-6" />
       </Button>
+
+      <Select.Root type="single" bind:value={player.selectedSource}>
+        <Select.Trigger
+          class="w-[150px] shadow-glass bg-background/50 border border-border backdrop-blur-md rounded-full focus-visible:ring-0 overflow-hidden"
+        >
+          <Glow />
+          {player.selectedSource === "Auto"
+            ? "Auto (Default)"
+            : player.selectedSource}
+        </Select.Trigger>
+        <Select.Portal>
+          <Select.Content
+            class="bg-background/50 backdrop-blur-md border border-border/80 rounded-3xl p-1 z-500 shadow-glass w-[160px]"
+          >
+            <Select.Item value="Auto" label="Auto (Default)" />
+            <Select.Item value="Unison" label="Unison" />
+            <Select.Item value="LyricsPlus" label="LyricsPlus" />
+            <Select.Item value="LRCLib" label="LRCLib" />
+            <Select.Item value="YouTube Music" label="YouTube Music" />
+          </Select.Content>
+        </Select.Portal>
+      </Select.Root>
     </header>
 
     <!-- Main Content -->
@@ -62,10 +82,7 @@
       <div class="w-1/2 absolute left-0 bottom-0">
         <PlayerBar isExtended />
       </div>
-      <div
-        transition:fly={{ y: 50, duration: 500, delay: 250 }}
-        class="w-full h-full min-h-0 flex flex-col relative overflow-hidden"
-      >
+      <div class="w-full h-full min-h-0 flex flex-col relative overflow-hidden">
         <Lyrics showInfo={false} isExtended />
       </div>
     </main>

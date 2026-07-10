@@ -53,6 +53,7 @@
   import Image from "$lib/components/ui/image.svelte";
   import Lyrics from "$lib/components/lyrics.svelte";
   import ExtendedPlayer from "$lib/components/extended-player.svelte";
+  import * as Select from "$lib/components/ui/select";
 
   let accountInfo = $state<AccountInfo | null>(null);
   let sidebarPlaylists = $state<PlaylistDetailed[]>([]);
@@ -486,6 +487,33 @@
                 <div class="h-12"></div>
               </ScrollArea>
             {:else if activeSidebar === "lyrics"}
+              <div class="absolute pt-4.5 z-10">
+                <Select.Root type="single" bind:value={player.selectedSource}>
+                  <Select.Trigger
+                    class="w-[150px] shadow-glass bg-background/50 border border-border backdrop-blur-md rounded-full focus-visible:ring-0 overflow-hidden"
+                  >
+                    <Glow />
+                    {player.selectedSource === "Auto"
+                      ? "Auto (Default)"
+                      : player.selectedSource}
+                  </Select.Trigger>
+                  <Select.Portal>
+                    <Select.Content
+                      class="bg-background/50 backdrop-blur-md border border-border/80 rounded-3xl p-1 z-500 shadow-glass w-[160px]"
+                    >
+                      <Select.Item value="Auto" label="Auto (Default)" />
+                      <Select.Item value="Unison" label="Unison" />
+                      <Select.Item value="LyricsPlus" label="LyricsPlus" />
+                      <Select.Item value="LRCLib" label="LRCLib" />
+                      <Select.Item
+                        value="YouTube Music"
+                        label="YouTube Music"
+                      />
+                    </Select.Content>
+                  </Select.Portal>
+                </Select.Root>
+              </div>
+
               <Lyrics />
             {/if}
           </div>

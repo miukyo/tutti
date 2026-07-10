@@ -1,4 +1,5 @@
 import { ytmusic } from "@app/preload";
+import { tick } from "svelte";
 
 export interface Track {
   videoId: string;
@@ -20,12 +21,26 @@ class PlayerStore {
   duration = $state(0);
   volume = $state(50); // 0-100
   isMuted = $state(false);
-  showExtended = $state(false);
+  #showExtended = $state(false);
+  get showExtended() {
+    return this.#showExtended;
+  }
+  set showExtended(val: boolean) {
+    if (typeof document !== "undefined" && document.startViewTransition) {
+      document.startViewTransition(async () => {
+        this.#showExtended = val;
+        await tick();
+      });
+    } else {
+      this.#showExtended = val;
+    }
+  }
   playbackRate = $state(1.0);
   lyricsFontSize = $state<'small' | 'medium' | 'large'>('medium');
   repeatMode = $state<'off' | 'all' | 'one'>('off');
   isShuffled = $state(false);
   originalQueue = $state<Track[]>([]);
+  selectedSource = $state("Auto");
 
   // Right sidebar tab state: 'none' | 'lyrics' | 'queue'
   #activeSidebar = $state<'none' | 'lyrics' | 'queue'>('queue');
@@ -41,7 +56,6 @@ class PlayerStore {
   audio: HTMLAudioElement | null = null;
   #stateLoaded = false;
   currentAbortController: AbortController | null = null;
-  currentObjectUrl: string | null = null;
   #stuckTimeout: any = null;
 
   init() {
@@ -63,6 +77,7 @@ class PlayerStore {
             this.saveState();
             lastSaveTime = now;
           }
+          this.#updateMediaSessionPositionState();
         }
       });
 
@@ -70,6 +85,7 @@ class PlayerStore {
         if (this.audio) {
           this.duration = this.audio.duration || 0;
           this.saveState();
+          this.#updateMediaSessionPositionState();
         }
       });
 
@@ -81,7 +97,7 @@ class PlayerStore {
 
       this.audio.addEventListener("waiting", () => {
         this.isBuffering = true;
-        if (this.isPlaying && this.audio && this.audio.src !== this.currentObjectUrl) {
+        if (this.isPlaying && this.audio) {
           this.clearStuckTimeout();
           this.#stuckTimeout = setTimeout(() => {
             console.warn("Audio playback stuck. Attempting recovery...");
@@ -96,6 +112,7 @@ class PlayerStore {
         if (this.audio) {
           this.audio.playbackRate = this.playbackRate;
         }
+        this.#updateMediaSessionPlaybackState();
       });
 
       this.audio.addEventListener("error", () => {
@@ -103,6 +120,74 @@ class PlayerStore {
         this.clearStuckTimeout();
         this.isBuffering = false;
         this.recoverStuckAudio();
+      });
+
+      if (typeof navigator !== "undefined" && "mediaSession" in navigator) {
+        navigator.mediaSession.setActionHandler("play", () => {
+          this.togglePlay();
+        });
+        navigator.mediaSession.setActionHandler("pause", () => {
+          this.togglePlay();
+        });
+        navigator.mediaSession.setActionHandler("nexttrack", () => {
+          this.next();
+        });
+        navigator.mediaSession.setActionHandler("previoustrack", () => {
+          this.prev();
+        });
+        navigator.mediaSession.setActionHandler("seekto", (details) => {
+          if (details.seekTime !== undefined) {
+            this.seek(details.seekTime);
+          }
+        });
+      }
+
+      window.addEventListener("keydown", (e) => {
+        const active = document.activeElement;
+        if (
+          active &&
+          (active.tagName === "INPUT" ||
+            active.tagName === "TEXTAREA" ||
+            active.hasAttribute("contenteditable") ||
+            (active as HTMLElement).isContentEditable)
+        ) {
+          return;
+        }
+
+        switch (e.key) {
+          case " ":
+            e.preventDefault();
+            this.togglePlay();
+            break;
+          case "ArrowLeft":
+            e.preventDefault();
+            this.seek(Math.max(0, this.currentTime - 5));
+            break;
+          case "ArrowRight":
+            e.preventDefault();
+            this.seek(Math.min(this.duration, this.currentTime + 5));
+            break;
+          case "ArrowUp":
+            e.preventDefault();
+            this.seek(Math.max(0, this.currentTime + 5));
+            break;
+          case "ArrowDown":
+            e.preventDefault();
+            this.seek(Math.max(0, this.currentTime - 5));
+            break;
+          case "m":
+          case "M":
+            this.toggleMute();
+            break;
+          case "n":
+          case "N":
+            this.next();
+            break;
+          case "p":
+          case "P":
+            this.prev();
+            break;
+        }
       });
     }
   }
@@ -128,25 +213,8 @@ class PlayerStore {
   }
 
   recoverStuckAudio() {
-    if (this.currentObjectUrl && this.audio) {
-      console.log("Recovering from local Blob URL...");
-      const savedTime = this.currentTime;
-      this.audio.src = this.currentObjectUrl;
-      const onCanPlay = () => {
-        if (this.audio) {
-          this.audio.currentTime = savedTime;
-          this.audio.play().then(() => {
-            this.isPlaying = true;
-          }).catch((err) => {
-            console.error("Failed to play recovered Blob:", err);
-          });
-        }
-      };
-      this.audio.addEventListener("canplay", onCanPlay, { once: true });
-    } else {
-      console.log("Blob URL not ready yet. Retrying stream recovery...");
-      this.resumeTrackStream();
-    }
+    console.log("Audio playback stuck or error. Retrying stream recovery...");
+    this.resumeTrackStream();
   }
 
   loadState() {
@@ -168,6 +236,7 @@ class PlayerStore {
         if (state.repeatMode) this.repeatMode = state.repeatMode;
         if (typeof state.isShuffled === "boolean") this.isShuffled = state.isShuffled;
         if (Array.isArray(state.originalQueue)) this.originalQueue = state.originalQueue;
+        if (state.selectedSource) this.selectedSource = state.selectedSource;
       }
     } catch (e) {
       console.error("Failed to load player state:", e);
@@ -191,6 +260,7 @@ class PlayerStore {
         repeatMode: this.repeatMode,
         isShuffled: this.isShuffled,
         originalQueue: this.originalQueue,
+        selectedSource: this.selectedSource,
       };
       localStorage.setItem("tutti_player_state", JSON.stringify(state));
     } catch (e) {
@@ -263,72 +333,9 @@ class PlayerStore {
         this.audio.currentTime = 0;
         this.audio.play().catch(console.error);
       }
-    } else if (this.repeatMode === 'off' && this.currentIndex === this.queue.length - 1) {
-      this.isPlaying = false;
-      this.isBuffering = false;
     } else {
       this.next();
     }
-  }
-
-  async downloadTrack(url: string, size: number, container: string, signal: AbortSignal): Promise<Blob> {
-    if (!size || size <= 0) {
-      const response = await fetch(url, { signal });
-      if (!response.ok) throw new Error(`HTTP error ${response.status}`);
-      return await response.blob();
-    }
-
-    const chunkSize = 1024 * 1024; // 1MB chunks
-    const numChunks = Math.ceil(size / chunkSize);
-    const buffers = new Array<ArrayBuffer>(numChunks);
-
-    // Limit concurrency to 3 parallel requests
-    const limit = 3;
-    let nextIndex = 0;
-
-    const worker = async () => {
-      while (nextIndex < numChunks && !signal.aborted) {
-        const index = nextIndex++;
-        const start = index * chunkSize;
-        const end = Math.min(start + chunkSize - 1, size - 1);
-
-        try {
-          const res = await fetch(url, {
-            headers: {
-              Range: `bytes=${start}-${end}`
-            },
-            signal
-          });
-          if (!res.ok) throw new Error(`HTTP error ${res.status} on chunk ${index}`);
-          buffers[index] = await res.arrayBuffer();
-        } catch (e) {
-          if (signal.aborted) throw e;
-          console.warn(`Retry chunk ${index} due to error:`, e);
-          await new Promise((resolve) => setTimeout(resolve, 500));
-          const res = await fetch(url, {
-            headers: {
-              Range: `bytes=${start}-${end}`
-            },
-            signal
-          });
-          if (!res.ok) throw new Error(`HTTP error ${res.status} on chunk ${index} retry`);
-          buffers[index] = await res.arrayBuffer();
-        }
-      }
-    };
-
-    const workers = [];
-    for (let i = 0; i < Math.min(limit, numChunks); i++) {
-      workers.push(worker());
-    }
-
-    await Promise.all(workers);
-
-    if (signal.aborted) {
-      throw new Error("Download aborted");
-    }
-
-    return new Blob(buffers, { type: `audio/${container}` });
   }
 
   async #fetchAndPlayStream(track: Track, startTime: number, signal: AbortSignal): Promise<void> {
@@ -380,22 +387,7 @@ class PlayerStore {
 
     this.isPlaying = true;
     this.saveState();
-
-    // Start downloading chunks in the background in parallel
-    this.downloadTrack(bestStream.url, bestStream.size, bestStream.container || "mp4", signal)
-      .then((blob) => {
-        if (signal.aborted || this.currentTrack?.videoId !== track.videoId) return;
-        if (this.currentObjectUrl) {
-          URL.revokeObjectURL(this.currentObjectUrl);
-        }
-        this.currentObjectUrl = URL.createObjectURL(blob);
-        console.log("Background download complete. Blob URL ready.");
-      })
-      .catch((err) => {
-        if (!signal.aborted) {
-          console.error("Background track download failed:", err);
-        }
-      });
+    this.#updateMediaSessionPlaybackState();
   }
 
   async #startStreamPlayback(track: Track, startTime: number, signal: AbortSignal): Promise<void> {
@@ -438,10 +430,7 @@ class PlayerStore {
       this.audio.src = "";
       this.audio.load();
     }
-    if (this.currentObjectUrl) {
-      URL.revokeObjectURL(this.currentObjectUrl);
-      this.currentObjectUrl = null;
-    }
+
 
     if (this.currentAbortController) {
       this.currentAbortController.abort();
@@ -472,6 +461,8 @@ class PlayerStore {
     this.currentTime = 0;
     this.duration = track.duration || 0;
     this.saveState();
+    this.#updateMediaSessionMetadata();
+    this.#updateMediaSessionPlaybackState();
 
     await this.#startStreamPlayback(track, 0, signal);
   }
@@ -525,15 +516,8 @@ class PlayerStore {
       this.audio.pause();
       this.isPlaying = false;
       this.isBuffering = false;
-
-      // Swap to Blob URL while paused so the next play is local and instant!
-      if (this.currentObjectUrl && this.audio.src !== this.currentObjectUrl) {
-        const savedTime = this.currentTime;
-        this.audio.src = this.currentObjectUrl;
-        this.audio.currentTime = savedTime;
-      }
-
       this.saveState();
+      this.#updateMediaSessionPlaybackState();
     } else {
       if (!this.audio.src || this.audio.src === "") {
         this.resumeTrackStream();
@@ -541,8 +525,9 @@ class PlayerStore {
         this.audio.play().then(() => {
           this.isPlaying = true;
           this.saveState();
+          this.#updateMediaSessionPlaybackState();
         }).catch((e) => {
-          console.warn("Failed to resume playback from cached src, attempting stream recovery...", e);
+          console.warn("Failed to resume playback, attempting stream recovery...", e);
           this.resumeTrackStream();
         });
       }
@@ -552,28 +537,70 @@ class PlayerStore {
   seek(time: number) {
     if (this.audio) {
       this.isBuffering = true;
-      if (this.currentObjectUrl && this.audio.src !== this.currentObjectUrl) {
-        // Swap to the local Blob URL since we are seeking anyway!
-        const wasPlaying = this.isPlaying;
-        this.audio.src = this.currentObjectUrl;
-        this.audio.currentTime = time;
-        this.currentTime = time;
-        if (wasPlaying) {
-          this.audio.play().catch(console.error);
-        }
-      } else {
-        this.audio.currentTime = time;
-        this.currentTime = time;
-      }
+      this.audio.currentTime = time;
+      this.currentTime = time;
       this.saveState();
+      this.#updateMediaSessionPositionState();
     }
   }
 
-  next() {
+  parseDurationStr(durationStr: string): number {
+    if (!durationStr) return 0;
+    const parts = durationStr.split(':').map(Number);
+    if (parts.some(isNaN)) return 0;
+    if (parts.length === 2) {
+      return parts[0] * 60 + parts[1];
+    } else if (parts.length === 3) {
+      return parts[0] * 3600 + parts[1] * 60 + parts[2];
+    }
+    return parts[0] || 0;
+  }
+
+  async next() {
     if (this.queue.length === 0) return;
     let nextIdx = this.currentIndex + 1;
     if (nextIdx >= this.queue.length) {
-      nextIdx = 0; // Loop queue
+      if (this.repeatMode === 'off') {
+        const lastTrack = this.currentTrack;
+        if (lastTrack) {
+          this.isBuffering = true;
+          try {
+            const upNexts = await ytmusic.getUpNexts(lastTrack.videoId);
+            const existingIds = new Set(this.queue.map((t) => t.videoId));
+            const newTracks: Track[] = [];
+
+            for (const item of upNexts) {
+              if (item.videoId && !existingIds.has(item.videoId)) {
+                newTracks.push({
+                  videoId: item.videoId,
+                  name: item.title,
+                  artist: item.artists,
+                  thumbnail: `https://i.ytimg.com/vi/${item.videoId}/hqdefault.jpg`,
+                  duration: this.parseDurationStr(item.duration)
+                });
+              }
+            }
+
+            if (newTracks.length > 0) {
+              this.queue = [...this.queue, ...newTracks];
+              if (this.originalQueue.length > 0) {
+                this.originalQueue = [...this.originalQueue, ...newTracks];
+              }
+              this.saveState();
+              this.playTrack(this.queue[nextIdx]);
+              return;
+            }
+          } catch (e) {
+            console.error("Failed to fetch autoplay upnexts:", e);
+          }
+        }
+        this.isPlaying = false;
+        this.isBuffering = false;
+        this.#updateMediaSessionPlaybackState();
+        return;
+      } else {
+        nextIdx = 0; // Loop queue
+      }
     }
     this.playTrack(this.queue[nextIdx]);
   }
@@ -585,6 +612,52 @@ class PlayerStore {
       prevIdx = this.queue.length - 1;
     }
     this.playTrack(this.queue[prevIdx]);
+  }
+
+  #updateMediaSessionMetadata() {
+    if (typeof navigator !== "undefined" && "mediaSession" in navigator && this.currentTrack) {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: this.currentTrack.name,
+        artist: this.currentTrack.artist,
+        artwork: [
+          {
+            src: this.currentTrack.thumbnail || `https://i.ytimg.com/vi/${this.currentTrack.videoId}/hqdefault.jpg`,
+            sizes: "512x512",
+            type: "image/jpeg"
+          }
+        ]
+      });
+    }
+  }
+
+  #updateMediaSessionPlaybackState() {
+    if (typeof navigator !== "undefined" && "mediaSession" in navigator) {
+      navigator.mediaSession.playbackState = this.isPlaying ? "playing" : "paused";
+      this.#updateMediaSessionPositionState();
+    }
+  }
+
+  #updateMediaSessionPositionState() {
+    if (
+      typeof navigator !== "undefined" &&
+      "mediaSession" in navigator &&
+      "setPositionState" in navigator.mediaSession &&
+      this.audio &&
+      !isNaN(this.audio.duration) &&
+      isFinite(this.audio.duration) &&
+      !isNaN(this.audio.currentTime) &&
+      isFinite(this.audio.currentTime)
+    ) {
+      try {
+        navigator.mediaSession.setPositionState({
+          duration: this.audio.duration,
+          playbackRate: this.audio.playbackRate || 1.0,
+          position: this.audio.currentTime
+        });
+      } catch (e) {
+        console.warn("Failed to set MediaSession position state:", e);
+      }
+    }
   }
 }
 

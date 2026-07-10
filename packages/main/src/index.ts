@@ -11,6 +11,10 @@ import { ytmusicModule } from './modules/YTMusicApiModule.js';
 import { garbageCollectorModule } from './modules/GarbageCollectorModule.js';
 
 export async function initApp(initConfig: AppInitConfig) {
+  app.name = 'Tutti';
+  if (process.platform === 'win32') {
+    app.setAppUserModelId('com.miukyo.tutti');
+  }
   // Expose garbage collection globally in Node and Chromium
   app.commandLine.appendSwitch('js-flags', '--expose-gc');
 

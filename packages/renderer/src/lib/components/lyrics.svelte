@@ -16,15 +16,22 @@
   let userScrollOffset = $state(0);
   let userScrollingTimeout: any = null;
   let {
-    showInfo = false,
+    showInfo = true,
     isExtended = false,
   }: { showInfo?: boolean; isExtended?: boolean } = $props();
 
-  // React to track changes
+  // React to track and source changes
   $effect(() => {
     const track = player.currentTrack;
+    const source = player.selectedSource;
     if (track) {
-      fetchLyrics(track.videoId, track.name, track.artist, track.duration);
+      fetchLyrics(
+        track.videoId,
+        track.name,
+        track.artist,
+        track.duration,
+        source,
+      );
     } else {
       lyricsResult = null;
     }
@@ -35,6 +42,7 @@
     title: string,
     artist: string,
     duration?: number | null,
+    source: string = "Auto",
   ) {
     loading = true;
     lyricsResult = null;
@@ -44,6 +52,7 @@
         title,
         artist,
         duration || undefined,
+        source,
       );
       if (player.currentTrack?.videoId !== videoId) return;
 
@@ -301,18 +310,42 @@
     return lastPastIndex;
   }
 
-  function isLineActive(line: LyricLine, timeMs: number) {
-    if (!lyricsResult || !lyricsResult.synced) return false;
-    return (
-      line.startTimeMs !== undefined &&
-      line.endTimeMs !== undefined &&
-      line.startTimeMs <= timeMs &&
-      timeMs < line.endTimeMs
-    );
-  }
-
   // Calculate scroll target index based on first active line (or fallback)
   let scrollTargetIndex = $derived(getFirstActiveIndex(adjustedTimeMs));
+
+  let activeIndicesStr = $derived.by(() => {
+    if (!lyricsResult || !lyricsResult.synced) return "";
+    const timeMs = adjustedTimeMs;
+    const indices: number[] = [];
+    for (let i = 0; i < lyricsResult.lines.length; i++) {
+      const line = lyricsResult.lines[i];
+      if (
+        line.startTimeMs !== undefined &&
+        line.endTimeMs !== undefined &&
+        line.startTimeMs <= timeMs &&
+        timeMs < line.endTimeMs
+      ) {
+        indices.push(i);
+      }
+    }
+    if (indices.length === 0 && scrollTargetIndex !== -1) {
+      indices.push(scrollTargetIndex);
+    }
+    return indices.join(",");
+  });
+
+  let pastIndicesStr = $derived.by(() => {
+    if (!lyricsResult || !lyricsResult.synced) return "";
+    const timeMs = adjustedTimeMs;
+    const indices: number[] = [];
+    for (let i = 0; i < lyricsResult.lines.length; i++) {
+      const line = lyricsResult.lines[i];
+      if (line.endTimeMs !== undefined && line.endTimeMs <= timeMs) {
+        indices.push(i);
+      }
+    }
+    return indices.join(",");
+  });
 
   let stableTargetIndex = $state(-1);
   let lastIndexChangeTime = 0;
@@ -466,9 +499,8 @@
     }
   }
 
-  function getWordProgress(word: any, isLineActive: boolean) {
-    if (!isLineActive) return adjustedTimeMs >= word.startTimeMs ? 1 : 0;
-    const elapsed = adjustedTimeMs - word.startTimeMs;
+  function getWordProgress(word: any, timeMs: number) {
+    const elapsed = timeMs - word.startTimeMs;
     if (elapsed < 0) return 0;
     const duration = word.durationMs || 300;
     return elapsed >= duration ? 1 : elapsed / duration;
@@ -519,11 +551,10 @@
         class="flex flex-col gap-6 w-full select-none"
       >
         {#each lyricsResult.lines as line, index}
-          {@const isActive = isLineActive(line, adjustedTimeMs)}
-          {@const isPast =
-            lyricsResult.synced &&
-            line.endTimeMs !== undefined &&
-            line.endTimeMs <= adjustedTimeMs}
+          {@const isActive = activeIndicesStr
+            .split(",")
+            .includes(index.toString())}
+          {@const isPast = pastIndicesStr.split(",").includes(index.toString())}
           {@const distance =
             isUserScrolling || stableTargetIndex === -1
               ? 0
@@ -557,7 +588,11 @@
               >
                 <div class="main-line flex flex-wrap">
                   {#each line.words as word, wIndex}
-                    {@const progress = getWordProgress(word, isActive)}
+                    {@const progress = isActive
+                      ? getWordProgress(word, adjustedTimeMs)
+                      : isPast
+                        ? 1
+                        : 0}
                     {@const isWordActive = progress > 0 && progress < 1}
                     {@const isWordPast = progress >= 1}
                     {@const isTransition =
@@ -586,7 +621,7 @@
                 </div>
                 {#if line.romanizedText}
                   <div
-                    class="romanized-line text-muted-foreground/60 text-[0.6em] font-normal leading-normal mt-1 select-none"
+                    class="romanized-line text-foreground/30 text-[0.6em] font-bold leading-normal mt-1 select-none"
                   >
                     {line.romanizedText}
                   </div>
@@ -662,18 +697,6 @@
     }
   }
 
-  @keyframes blyrics-glow {
-    0% {
-      filter: drop-shadow(0 0 0rem rgba(255, 255, 255, 0));
-    }
-    1% {
-      filter: drop-shadow(0 0 0.4rem rgba(255, 255, 255, 1));
-    }
-    100% {
-      filter: drop-shadow(0 0 0rem rgba(255, 255, 255, 0));
-    }
-  }
-
   .lyric-line {
     cursor: pointer;
     transform-origin: left center;
@@ -689,7 +712,7 @@
     font-size: var(--lyric-font-size, 1.5rem);
 
     /* Progressive blur and opacity based on distance from active index */
-    --blur-amount: calc(var(--distance, 0) * 0.5px);
+    /* --blur-amount: calc(var(--distance, 0) * 0.5px); */
     --opacity-amount: calc(1 - var(--distance, 0) * 0.1);
     opacity: max(0.15, var(--opacity-amount));
     /* filter: blur(var(--blur-amount)); */
@@ -703,11 +726,6 @@
   .lyric-line.active {
     transform: scale(1.03);
     opacity: 1;
-    filter: drop-shadow(0 0 0.8rem rgba(255, 255, 255, 0.3));
-    transition:
-      transform 0.25s ease,
-      opacity 0.25s ease,
-      filter 0.25s ease;
   }
 
   .lyric-line.is-extended {
@@ -727,19 +745,11 @@
     display: inline-block;
     transform-origin: left center;
     will-change: transform;
-    transition:
-      transform 0.3s ease,
-      drop-shadow 0.33s ease;
-    animation: blyrics-wobble 1s forwards ease;
-    animation-play-state: paused;
+    transition: transform 0.5s cubic-bezier(0.33, 1, 0.68, 1);
   }
 
   .word-wrapper.active {
-    animation-play-state: running;
-  }
-
-  .word-wrapper.past {
-    animation-play-state: running;
+    transform: translateY(-0.08em) scaleX(1.04);
   }
 
   .word-span {
@@ -750,12 +760,11 @@
     color: rgba(255, 255, 255, 0.25);
     white-space: pre-wrap;
     transform-origin: left center;
-    animation: blyrics-glow 2s forwards ease;
-    animation-play-state: paused;
+    filter: drop-shadow(0 0 0.4rem rgba(255, 255, 255, 0));
   }
 
   .word-wrapper.active .word-span {
-    color: #ffffff;
+    color: transparent;
     background: linear-gradient(
       to right,
       #ffffff calc(var(--progress, 0) * 100% - 8px),
@@ -763,12 +772,14 @@
     );
     -webkit-background-clip: text;
     background-clip: text;
-    animation-play-state: initial;
+    filter: drop-shadow(0 0 0.4rem rgba(255, 255, 255, 1));
+    transition: filter 0.2s ease;
   }
 
   .word-wrapper.past .word-span {
     color: #ffffff;
-    animation-play-state: running;
+    filter: drop-shadow(0 0 0rem rgba(255, 255, 255, 0));
+    transition: filter 2s ease;
   }
 
   .lyric-line.is-background {

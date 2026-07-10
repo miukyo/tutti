@@ -156,8 +156,12 @@ function shouldCacheYTRequest(endpoint: string, body: any, urlStr: string = ''):
 const fetch = async (url: any, init?: any): Promise<any> => {
   const urlStr = typeof url === 'string' ? url : (url as any).url || '';
 
-  // Check if it's Unison or LRCLib lyrics
-  if (urlStr.includes('unison.boidu.dev') || urlStr.includes('lrclib.net')) {
+  // Check if it's a known lyrics API endpoint
+  if (
+    urlStr.includes('unison.boidu.dev') ||
+    urlStr.includes('lrclib.net') ||
+    urlStr.includes('lyrics.geeked.wtf')
+  ) {
     return lyricsCachedFetch(url, init);
   }
 
@@ -814,7 +818,7 @@ export class YTMusic {
     return video;
   }
 
-  async getLyrics(videoId: string, title?: string, artist?: string, duration?: number): Promise<LyricResult | null> {
+  async getLyrics(videoId: string, title?: string, artist?: string, duration?: number, source: string = 'Auto'): Promise<LyricResult | null> {
     if (!/^[a-zA-Z0-9-_]{11}$/.test(videoId)) {
       throw new Error('Invalid videoId: must be 11 characters.');
     }
@@ -834,125 +838,151 @@ export class YTMusic {
       }
     }
 
-
-
-    // 1. Try Unison
-    try {
-      const keyId = getOrCreateKeyId();
-      const unisonUrl = new URL('https://unison.boidu.dev/lyrics');
-      unisonUrl.searchParams.append('v', videoId);
-      if (songTitle) unisonUrl.searchParams.append('song', songTitle);
-      if (songArtist) unisonUrl.searchParams.append('artist', songArtist);
-      if (songDuration) unisonUrl.searchParams.append('duration', String(Math.round(songDuration)));
-
-      const response = await fetch(unisonUrl.toString(), {
-        headers: { 'x-key-id': keyId }
-      });
-      if (response.ok) {
-        const json = await response.json() as any;
-        const data = json.data;
-        if (data && data.lyrics && data.format) {
-          if (data.format === 'lrc') {
-            const lines = parseLrc(data.lyrics);
-            if (lines.length > 0) {
-              return { synced: true, lines, source: 'Unison' };
-            }
-          } else if (data.format === 'ttml') {
-            const lines = parseTtml(data.lyrics);
-            if (lines.length > 0) {
-              return { synced: true, lines, source: 'Unison (TTML)' };
-            }
-          } else if (data.format === 'plain') {
-            const lines = data.lyrics.split('\n').map((l: string) => ({ text: l.trim() })).filter((l: any) => l.text);
-            return { synced: false, lines, source: 'Unison' };
-          }
-        }
-      }
-    } catch (e) {
-      console.warn("Unison lyrics fetch failed:", e);
-    }
-
-    // 2. Try LyricsPlus (binimum)
-    if (songTitle && songArtist) {
+    const runUnison = async (): Promise<LyricResult | null> => {
       try {
-        const url = new URL('https://lyricsplus.binimum.org/v2/lyrics/get');
-        url.searchParams.append('title', songTitle);
-        url.searchParams.append('artist', songArtist);
-        if (songDuration) {
-          url.searchParams.append('duration', String(Math.round(songDuration)));
-        }
+        const keyId = getOrCreateKeyId();
+        const unisonUrl = new URL('https://unison.boidu.dev/lyrics');
+        unisonUrl.searchParams.append('v', videoId);
+        if (songTitle) unisonUrl.searchParams.append('song', songTitle);
+        if (songArtist) unisonUrl.searchParams.append('artist', songArtist);
+        if (songDuration) unisonUrl.searchParams.append('duration', String(Math.round(songDuration)));
 
-        const response = await fetch(url.toString());
+        const response = await fetch(unisonUrl.toString(), {
+          headers: { 'x-key-id': keyId }
+        });
         if (response.ok) {
           const json = await response.json() as any;
-          if (json) {
-            const lines = parseLyricsPlus(json);
-            if (lines && lines.length > 0) {
-              const sourceLabel = json.metadata?.source || json.metadata?.provider || 'LyricsPlus';
-              const isUnsynced = lines.every((line) => !line.startTimeMs && !line.endTimeMs);
-              return { synced: !isUnsynced, lines, source: sourceLabel };
+          const data = json.data;
+          if (data && data.lyrics && data.format) {
+            if (data.format === 'lrc') {
+              const lines = parseLrc(data.lyrics);
+              if (lines.length > 0) {
+                return { synced: true, lines, source: 'Unison' };
+              }
+            } else if (data.format === 'ttml') {
+              const lines = parseTtml(data.lyrics);
+              if (lines.length > 0) {
+                return { synced: true, lines, source: 'Unison (TTML)' };
+              }
+            } else if (data.format === 'plain') {
+              const lines = data.lyrics.split('\n').map((l: string) => ({ text: l.trim() })).filter((l: any) => l.text);
+              return { synced: false, lines, source: 'Unison' };
             }
           }
         }
       } catch (e) {
-        console.warn("LyricsPlus lyrics fetch failed:", e);
+        console.warn("Unison lyrics fetch failed:", e);
       }
-    }
+      return null;
+    };
 
-    // 3. Try LRCLib
-    if (songTitle && songArtist) {
+    const runLyricsPlus = async (): Promise<LyricResult | null> => {
+      if (songTitle && songArtist) {
+        try {
+          const url = new URL('https://lyrics.geeked.wtf/v2/lyrics/get');
+          url.searchParams.append('title', songTitle);
+          url.searchParams.append('artist', songArtist);
+          if (songDuration) {
+            url.searchParams.append('duration', String(Math.round(songDuration)));
+          }
+
+          const response = await fetch(url.toString());
+          if (response.ok) {
+            const json = await response.json() as any;
+            if (json) {
+              const lines = parseLyricsPlus(json);
+              if (lines && lines.length > 0) {
+                const sourceLabel = json.metadata?.source || json.metadata?.provider || 'LyricsPlus';
+                const isUnsynced = lines.every((line) => !line.startTimeMs && !line.endTimeMs);
+                return { synced: !isUnsynced, lines, source: sourceLabel };
+              }
+            }
+          }
+        } catch (e) {
+          console.warn("LyricsPlus lyrics fetch failed:", e);
+        }
+      }
+      return null;
+    };
+
+    const runLRCLib = async (): Promise<LyricResult | null> => {
+      if (songTitle && songArtist) {
+        try {
+          const lrcUrl = new URL('https://lrclib.net/api/get');
+          lrcUrl.searchParams.append('artist_name', songArtist);
+          lrcUrl.searchParams.append('track_name', songTitle);
+          if (songDuration) {
+            lrcUrl.searchParams.append('duration', String(Math.round(songDuration)));
+          }
+
+          const response = await fetch(lrcUrl.toString());
+          if (response.ok) {
+            const data = await response.json() as any;
+            if (data.syncedLyrics) {
+              const lines = parseLrc(data.syncedLyrics);
+              if (lines.length > 0) {
+                return { synced: true, lines, source: 'LRCLib' };
+              }
+            }
+            if (data.plainLyrics) {
+              const lines = data.plainLyrics.split('\n').map((l: string) => ({ text: l.trim() })).filter((l: any) => l.text);
+              return { synced: false, lines, source: 'LRCLib' };
+            }
+          }
+        } catch (e) {
+          console.warn("LRCLib lyrics fetch failed:", e);
+        }
+      }
+      return null;
+    };
+
+    const runYouTubeMusic = async (): Promise<LyricResult | null> => {
       try {
-        const lrcUrl = new URL('https://lrclib.net/api/get');
-        lrcUrl.searchParams.append('artist_name', songArtist);
-        lrcUrl.searchParams.append('track_name', songTitle);
-        if (songDuration) {
-          lrcUrl.searchParams.append('duration', String(Math.round(songDuration)));
-        }
-
-        const response = await fetch(lrcUrl.toString());
-        if (response.ok) {
-          const data = await response.json() as any;
-          if (data.syncedLyrics) {
-            const lines = parseLrc(data.syncedLyrics);
-            if (lines.length > 0) {
-              return { synced: true, lines, source: 'LRCLib' };
+        const data = await this.constructRequest('next', { videoId });
+        const tabs = traverseList(data, 'tabs', 'tabRenderer');
+        if (tabs.length >= 2) {
+          const browseId = traverseString(tabs[1], 'browseId');
+          if (browseId) {
+            const lyricsData = await this.constructRequest('browse', { browseId });
+            const lyrics = traverseString(lyricsData, 'description', 'runs', 'text');
+            if (lyrics) {
+              const lines = lyrics
+                .replace(/\r/g, '')
+                .split('\n')
+                .map((l: string) => ({ text: l.trim() }))
+                .filter((l: any) => l.text);
+              return { synced: false, lines, source: 'YouTube Music' };
             }
-          }
-          if (data.plainLyrics) {
-            const lines = data.plainLyrics.split('\n').map((l: string) => ({ text: l.trim() })).filter((l: any) => l.text);
-            return { synced: false, lines, source: 'LRCLib' };
           }
         }
       } catch (e) {
-        console.warn("LRCLib lyrics fetch failed:", e);
+        console.warn("YouTube Music lyrics fetch failed:", e);
       }
-    }
+      return null;
+    };
 
-    // 4. Fallback to YouTube Music plain text scraper
-    try {
-      const data = await this.constructRequest('next', { videoId });
-      const tabs = traverseList(data, 'tabs', 'tabRenderer');
-      if (tabs.length >= 2) {
-        const browseId = traverseString(tabs[1], 'browseId');
-        if (browseId) {
-          const lyricsData = await this.constructRequest('browse', { browseId });
-          const lyrics = traverseString(lyricsData, 'description', 'runs', 'text');
-          if (lyrics) {
-            const lines = lyrics
-              .replace(/\r/g, '')
-              .split('\n')
-              .map((l: string) => ({ text: l.trim() }))
-              .filter((l: any) => l.text);
-            return { synced: false, lines, source: 'YouTube Music' };
-          }
-        }
-      }
-    } catch (e) {
-      console.warn("YouTube Music lyrics fetch failed:", e);
-    }
+    if (source === 'Unison') return await runUnison();
+    if (source === 'LyricsPlus') return await runLyricsPlus();
+    if (source === 'LRCLib') return await runLRCLib();
+    if (source === 'YouTube Music') return await runYouTubeMusic();
+
+    // Default (Auto): sequential fallback
+    let res = await runUnison();
+    if (res) return res;
+
+    res = await runLyricsPlus();
+    if (res) return res;
+
+    res = await runLRCLib();
+    if (res) return res;
+
+    res = await runYouTubeMusic();
+    if (res) return res;
 
     return null;
   }
+
+
 
   // Artist
   async getArtist(artistId: string): Promise<ArtistFull> {
