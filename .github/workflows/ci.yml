@@ -49,14 +49,14 @@ jobs:
           echo "- \`APP_VERSION\`: ${{ steps.APP_VERSION.outputs.APP_VERSION }}" >> $GITHUB_STEP_SUMMARY
           echo "- \`APP_FULL_VERSION\`: ${{ steps.APP_FULL_VERSION.outputs.APP_FULL_VERSION }}" >> $GITHUB_STEP_SUMMARY
 
-  compile-and-test:
+  compile:
     needs:
       - prepare
     permissions:
       contents: write
       id-token: write
       attestations: write
-    uses: ./.github/workflows/compile-and-test.yml
+    uses: ./.github/workflows/compile.yml
     with:
       app-version: ${{ needs.prepare.outputs.APP_FULL_VERSION }}
       distribution-channel: ${{inputs.distribution-channel}}
@@ -67,7 +67,7 @@ jobs:
       contents: write
     needs:
       - prepare
-      - compile-and-test
+      - compile
     uses: ./.github/workflows/deploy.yml
     with:
       app-version: ${{ needs.prepare.outputs.APP_FULL_VERSION }}
