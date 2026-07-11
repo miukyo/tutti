@@ -1,10 +1,14 @@
-# 🎵 Tutti — Desktop YouTube Music Client
+
+<center><img src="buildResources/icon.png" width="150" /></center>
+<br/>
+
+# Tutti — Desktop YouTube Music Client
 
 **Tutti** is a beautifully designed, desktop client for YouTube Music. Built using Electron, Svelte 5, TypeScript, and Tailwind CSS.
 
 ---
 
-## ✨ Features
+## Features
 
 - **Desktop Experience**: A modern, immersive UI built with Svelte 5 and Tailwind CSS.
 - **YouTube Music Integration**: Instantly stream songs, videos, albums, playlists, and artists.
@@ -13,7 +17,14 @@
 
 ---
 
-## 🚀 Quick Start
+## Screenshots
+
+<div style="display: flex; gap: 10px; flex-wrap: wrap;">
+  <img src=".github/ss1.png" style="border-radius: 10px;" />
+  <img src=".github/ss2.png" style="border-radius: 10px;" />
+</div>
+
+## Quick Start
 
 ### Prerequisites
 
@@ -48,6 +59,6 @@ npm run compile
 
 ---
 
-## 📄 License
+## License
 
 This project is licensed under the [MIT License](./LICENSE).

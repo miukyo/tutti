@@ -132,10 +132,14 @@
         const info = await ytmusic.getAccountInfo();
         if (info && info.accountName) {
           accountInfo = info;
+          player.isAuthed = true;
           await refreshPlaylists();
+        } else {
+          player.isAuthed = false;
         }
       } catch (e) {
         console.warn("Failed to fetch sidebar playlists:", e);
+        player.isAuthed = false;
       }
     }
 

@@ -45,6 +45,7 @@ class PlayerStore {
   likeStatus = $state<'Indifferent' | 'Like' | 'Dislike'>('Indifferent');
   likedSongsLoaded = $state(false);
   likedSongIds = $state<string[]>([]);
+  isAuthed = $state<boolean | null>(null);
 
   // Right sidebar tab state: 'none' | 'lyrics' | 'queue'
   #activeSidebar = $state<'none' | 'lyrics' | 'queue'>('queue');
@@ -73,7 +74,21 @@ class PlayerStore {
     if (typeof window !== "undefined" && !this.audio) {
       this.audio = new Audio();
       this.loadState();
-      this.fetchLikedSongs();
+      
+      if (this.isAuthed === null) {
+        ytmusic.getAccountInfo().then((info) => {
+          if (info && info.accountName) {
+            this.isAuthed = true;
+            this.fetchLikedSongs();
+          } else {
+            this.isAuthed = false;
+          }
+        }).catch(() => {
+          this.isAuthed = false;
+        });
+      } else if (this.isAuthed) {
+        this.fetchLikedSongs();
+      }
 
       this.audio.volume = this.volume / 100;
       this.audio.muted = this.isMuted;
@@ -343,7 +358,7 @@ class PlayerStore {
   }
 
   async fetchLikedSongs() {
-
+    if (this.isAuthed === false) return;
     if (this.likedSongsLoaded) return;
     try {
       const likedSongs = await ytmusic.getPlaylistVideos('VLLM');

@@ -162,7 +162,6 @@
           data-glow
           onclick={() => currentTrack && (player.showExtended = true)}
         >
-
           {#if currentTrack}
             <div class="flex gap-2 items-center min-w-0">
               <Image
@@ -235,32 +234,38 @@
         />
       </div>
 
-      <Button
-        size="icon"
-        variant="link"
-        disabled={!currentTrack}
-        class="active:scale-60 -mr-3 max-2xl:peer-hover/slider:scale-0 max-2xl:peer-hover/slider:opacity-0 transition-all duration-300"
-        onclick={() => player.toggleLike()}
-      >
-        <ThumbsUpIcon
-          class="size-5"
-          fill={player.likeStatus === "Like" ? "currentColor" : "none"}
-        />
-      </Button>
-      <Button
-        size="icon"
-        variant="link"
-        class="active:scale-60 -mr-2  max-xl:peer-hover/slider:scale-0 max-xl:peer-hover/slider:opacity-0 transition-all duration-300"
-        disabled={!currentTrack}
-        onclick={() => (isDialogOpened = true)}
-      >
-        <BookmarkPlusIcon class="size-5" />
-      </Button>
+      {#if player.isAuthed}
+        <Button
+          size="icon"
+          variant="link"
+          disabled={!currentTrack}
+          class="active:scale-60 -mr-3 {isExtended
+            ? ''
+            : 'max-2xl:peer-hover/slider:scale-0 max-2xl:peer-hover/slider:opacity-0'} transition-all duration-300"
+          onclick={() => player.toggleLike()}
+        >
+          <ThumbsUpIcon
+            class="size-5"
+            fill={player.likeStatus === "Like" ? "currentColor" : "none"}
+          />
+        </Button>
+        <Button
+          size="icon"
+          variant="link"
+          class="active:scale-60 -mr-2 {isExtended
+            ? ''
+            : 'max-2xl:peer-hover/slider:scale-0 max-2xl:peer-hover/slider:opacity-0'} transition-all duration-300"
+          disabled={!currentTrack}
+          onclick={() => (isDialogOpened = true)}
+        >
+          <BookmarkPlusIcon class="size-5" />
+        </Button>
+      {/if}
 
       <!-- Svelte 5 slider volume bindings -->
     </div>
     {#if isExtended}
-      <div class="order-5 w-11"></div>
+      <div class="order-5 {player.isAuthed ? 'w-28' : 'w-11'}"></div>
     {/if}
   </div>
 </div>
