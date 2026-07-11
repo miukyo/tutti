@@ -1,66 +1,68 @@
 <script lang="ts">
   import { onMount } from "svelte";
 
-  let container: HTMLDivElement;
+  let glowEl: HTMLDivElement;
+  let currentTarget: HTMLElement | null = $state(null);
   let isHovered = $state(false);
   let isActive = $state(false);
 
-  function handleMouseMove(event: MouseEvent) {
-    if (!container) return;
-
-    // Calculate mouse position relative to the container
-    const rect = container.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
-
-    // Update CSS variables for high-performance rendering
-    container.style.setProperty("--mouse-x", `${x}px`);
-    container.style.setProperty("--mouse-y", `${y}px`);
+  function handleMouseMove(e: MouseEvent) {
+    if (!glowEl) return;
+    const target = (e.target as HTMLElement).closest("[data-glow]");
+    if (target instanceof HTMLElement) {
+      currentTarget = target;
+      if (glowEl.parentElement !== target) {
+        target.appendChild(glowEl);
+      }
+      isHovered = true;
+      const rect = target.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      glowEl.style.setProperty("--mouse-x", `${x}px`);
+      glowEl.style.setProperty("--mouse-y", `${y}px`);
+    } else {
+      isHovered = false;
+      isActive = false;
+      currentTarget = null;
+    }
   }
 
   onMount(() => {
-    const parent = container.parentElement;
-    if (!parent) return;
+    const handleMouseDown = () => {
+      if (currentTarget) isActive = true;
+    };
 
-    const handleEnter = () => (isHovered = true);
-    const handleLeave = () => {
-      isHovered = false;
+    const handleMouseUp = () => {
       isActive = false;
     };
-    const handleMouseDown = () => (isActive = true);
-    const handleMouseUp = () => (isActive = false);
 
-    parent.addEventListener("mousemove", handleMouseMove);
-    parent.addEventListener("mouseenter", handleEnter);
-    parent.addEventListener("mouseleave", handleLeave);
-    parent.addEventListener("mousedown", handleMouseDown);
-    parent.addEventListener("mouseup", handleMouseUp);
+    document.addEventListener("mousemove", handleMouseMove, true);
+    document.addEventListener("mousedown", handleMouseDown, true);
+    document.addEventListener("mouseup", handleMouseUp, true);
 
     return () => {
-      parent.removeEventListener("mousemove", handleMouseMove);
-      parent.removeEventListener("mouseenter", handleEnter);
-      parent.removeEventListener("mouseleave", handleLeave);
-      parent.removeEventListener("mousedown", handleMouseDown);
-      parent.removeEventListener("mouseup", handleMouseUp);
+      document.removeEventListener("mousemove", handleMouseMove, true);
+      document.removeEventListener("mousedown", handleMouseDown, true);
+      document.removeEventListener("mouseup", handleMouseUp, true);
     };
   });
 </script>
 
 <div
-  bind:this={container}
+  bind:this={glowEl}
   role="presentation"
-  class="absolute size-full pointer-events-none"
+  class="absolute pointer-events-none inset-0 size-full overflow-hidden"
 >
   <div
     class="
 		absolute w-10 h-10 rounded-full pointer-events-none
 		bg-radial from-white to-transparent
 		blur-lg
-        mix-blend-overlay
+        mix-blend-screen
 		left-(--mouse-x) top-(--mouse-y) -translate-x-1/2 -translate-y-1/2
 		transition-[opacity,transform,scale]! duration-500 ease-out will-change-[top,left,opacity,transform,scale]
 	"
-    class:opacity-100={isHovered}
+    class:opacity-60={isHovered}
     class:opacity-0={!isHovered}
     class:scale-150={isActive}
   ></div>

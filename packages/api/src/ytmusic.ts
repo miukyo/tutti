@@ -143,7 +143,7 @@ function shouldCacheYTRequest(endpoint: string, body: any, urlStr: string = ''):
       if (playlistId === 'LM' || playlistId === 'SE') {
         return false;
       }
-      if (userPlaylistIds.has(playlistId)) {
+      if (userPlaylistIds.has(browseId)) {
         return false;
       }
       return true;
@@ -232,6 +232,7 @@ export class YTMusic {
   private sapisid: string | null = null;
   private origin: string | null = null;
   private authUser: string = '0';
+  private accountName: string | null = null;
 
   constructor() { }
 
@@ -1096,11 +1097,11 @@ export class YTMusic {
   }
 
   async getLikedSongs(): Promise<PlaylistFull> {
-    return await this.getPlaylist('LM');
+    return await this.getPlaylist('VLLM');
   }
 
   async getSavedEpisodes(): Promise<PlaylistFull> {
-    return await this.getPlaylist('SE');
+    return await this.getPlaylist('VLSE');
   }
 
   // Playlist CRUD
@@ -1124,12 +1125,14 @@ export class YTMusic {
   }
 
   async deletePlaylist(playlistId: string): Promise<any> {
+    const cleanId = playlistId.startsWith('VL') ? playlistId.slice(2) : playlistId;
     return await this.constructRequest('playlist/delete', {
-      playlistId
+      playlistId: cleanId
     });
   }
 
   async editPlaylist(playlistId: string, title: string | null = null, description: string | null = null, privacyStatus: string | null = null): Promise<any> {
+    const cleanId = playlistId.startsWith('VL') ? playlistId.slice(2) : playlistId;
     const actions: any[] = [];
 
     if (title !== null) {
@@ -1154,19 +1157,21 @@ export class YTMusic {
     }
 
     return await this.constructRequest('browse/edit_playlist', {
-      playlistId,
+      playlistId: cleanId,
       actions
     });
   }
 
   async addPlaylistItems(playlistId: string, videoIds: string[], sourcePlaylist: string | null = null, duplicates: boolean = false): Promise<any> {
+    const cleanId = playlistId.startsWith('VL') ? playlistId.slice(2) : playlistId;
     const actions: any[] = [];
+
 
     for (const videoId of videoIds) {
       actions.push({
         action: 'ACTION_ADD_VIDEO',
         addedVideoId: videoId,
-        dedupeOption: duplicates ? 'DEDUPE_OPTION_SKIP' : ''
+        dedupeOption: 'DEDUPE_OPTION_SKIP'
       });
     }
 
@@ -1178,12 +1183,13 @@ export class YTMusic {
     }
 
     return await this.constructRequest('browse/edit_playlist', {
-      playlistId,
+      playlistId: cleanId,
       actions
     });
   }
 
   async removePlaylistItems(playlistId: string, videos: { setVideoId: string; removedVideoId: string }[]): Promise<any> {
+    const cleanId = playlistId.startsWith('VL') ? playlistId.slice(2) : playlistId;
     const actions: any[] = [];
 
     for (const video of videos) {
@@ -1195,7 +1201,7 @@ export class YTMusic {
     }
 
     return await this.constructRequest('browse/edit_playlist', {
-      playlistId,
+      playlistId: cleanId,
       actions
     });
   }
@@ -1413,7 +1419,7 @@ export class YTMusic {
 
     for (const item of items) {
       if (results.length >= limit) break;
-      const parsed = playlistParser.parseLibraryPlaylist(item);
+      const parsed = playlistParser.parseLibraryPlaylist(item, this.accountName);
       if (parsed) {
         results.push(parsed);
         if (parsed.playlistId) {
@@ -1433,7 +1439,7 @@ export class YTMusic {
         const contItems = contGrid ? YTMusic.getRendererItems(contGrid, ['items']) : [];
         for (const item of contItems) {
           if (results.length >= limit) break;
-          const parsed = playlistParser.parseLibraryPlaylist(item);
+          const parsed = playlistParser.parseLibraryPlaylist(item, this.accountName);
           if (parsed) {
             results.push(parsed);
             if (parsed.playlistId) {
@@ -1721,8 +1727,11 @@ export class YTMusic {
       channelId = traverseString(header, 'navigationEndpoint', 'browseEndpoint', 'browseId');
     }
 
+    const accountName = traverseString(header, 'accountName', 'runs', 'text');
+    this.accountName = accountName || null;
+
     return {
-      accountName: traverseString(header, 'accountName', 'runs', 'text'),
+      accountName,
       channelHandle: traverseString(header, 'channelHandle', 'runs', 'text') || null,
       channelId: channelId || null,
       accountPhotoUrl: traverseString(header, 'accountPhoto', 'thumbnails', 'url')

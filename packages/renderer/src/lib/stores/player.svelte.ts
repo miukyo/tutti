@@ -8,6 +8,7 @@ export interface Track {
   artistId?: string | null;
   thumbnail: string;
   duration?: number | null;
+  setVideoId?: string | null;
 }
 
 class PlayerStore {
@@ -41,6 +42,9 @@ class PlayerStore {
   isShuffled = $state(false);
   originalQueue = $state<Track[]>([]);
   selectedSource = $state("Auto");
+  likeStatus = $state<'Indifferent' | 'Like' | 'Dislike'>('Indifferent');
+  likedSongsLoaded = $state(false);
+  likedSongIds = $state<string[]>([]);
 
   // Right sidebar tab state: 'none' | 'lyrics' | 'queue'
   #activeSidebar = $state<'none' | 'lyrics' | 'queue'>('queue');
@@ -69,6 +73,7 @@ class PlayerStore {
     if (typeof window !== "undefined" && !this.audio) {
       this.audio = new Audio();
       this.loadState();
+      this.fetchLikedSongs();
 
       this.audio.volume = this.volume / 100;
       this.audio.muted = this.isMuted;
@@ -233,7 +238,10 @@ class PlayerStore {
         const state = JSON.parse(saved);
         if (typeof state.volume === "number") this.volume = state.volume;
         if (typeof state.isMuted === "boolean") this.isMuted = state.isMuted;
-        if (state.currentTrack) this.currentTrack = state.currentTrack;
+        if (state.currentTrack) {
+          this.currentTrack = state.currentTrack;
+          this.likeStatus = this.likedSongIds.includes(state.currentTrack.videoId) ? 'Like' : 'Indifferent';
+        }
         if (Array.isArray(state.queue)) this.queue = state.queue;
         if (typeof state.currentIndex === "number") this.currentIndex = state.currentIndex;
         if (typeof state.currentTime === "number") this.currentTime = state.currentTime;
@@ -332,6 +340,54 @@ class PlayerStore {
       this.repeatMode = 'off';
     }
     this.saveState();
+  }
+
+  async fetchLikedSongs() {
+
+    if (this.likedSongsLoaded) return;
+    try {
+      const likedSongs = await ytmusic.getPlaylistVideos('VLLM');
+
+      this.likedSongIds = likedSongs.map(s => s.videoId).filter(Boolean) as string[];
+      this.likedSongsLoaded = true;
+      // Update likeStatus for currentTrack if loaded
+      if (this.currentTrack) {
+        this.likeStatus = this.likedSongIds.includes(this.currentTrack.videoId) ? 'Like' : 'Indifferent';
+      }
+    } catch (e) {
+      console.warn("Failed to fetch liked songs:", e);
+    }
+  }
+
+  async toggleLike() {
+    if (!this.currentTrack) return;
+    const targetStatus = this.likeStatus === 'Like' ? 'Indifferent' : 'Like';
+    const prevStatus = this.likeStatus;
+
+    // Optimistic update
+    this.likeStatus = targetStatus;
+    if (targetStatus === 'Like') {
+      if (!this.likedSongIds.includes(this.currentTrack.videoId)) {
+        this.likedSongIds.push(this.currentTrack.videoId);
+      }
+    } else {
+      this.likedSongIds = this.likedSongIds.filter(id => id !== this.currentTrack?.videoId);
+    }
+
+    try {
+      await ytmusic.rateSong(this.currentTrack.videoId, targetStatus);
+    } catch (e) {
+      console.error("Failed to rate song:", e);
+      // Revert on error
+      this.likeStatus = prevStatus;
+      if (prevStatus === 'Like') {
+        if (!this.likedSongIds.includes(this.currentTrack.videoId)) {
+          this.likedSongIds.push(this.currentTrack.videoId);
+        }
+      } else {
+        this.likedSongIds = this.likedSongIds.filter(id => id !== this.currentTrack?.videoId);
+      }
+    }
   }
 
   handleSongEnded() {
@@ -467,6 +523,7 @@ class PlayerStore {
     this.isBuffering = true;
     this.currentTime = 0;
     this.duration = track.duration || 0;
+    this.likeStatus = this.likedSongIds.includes(track.videoId) ? 'Like' : 'Indifferent';
     this.saveState();
     this.#updateMediaSessionMetadata();
     this.#updateMediaSessionPlaybackState();

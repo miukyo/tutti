@@ -90,6 +90,8 @@ export function parsePlaylistVideo(item: any): VideoDetailed | null {
 
   const artistId = traverseString(artist, 'browseId');
 
+  const setVideoId = traverseString(item, 'playlistItemData', 'playlistSetVideoId');
+
   return {
     type: 'VIDEO',
     videoId: videoId1 || videoId2!,
@@ -99,6 +101,7 @@ export function parsePlaylistVideo(item: any): VideoDetailed | null {
       artistId: artistId || null
     },
     duration: parseDuration(durationNode ? traverseString(durationNode, 'text') : null),
-    thumbnails
+    thumbnails,
+    setVideoId: setVideoId || null
   };
 }

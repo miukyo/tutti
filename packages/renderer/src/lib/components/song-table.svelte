@@ -1,8 +1,9 @@
 <script lang="ts">
-  import { PlayIcon, ClockIcon } from "@lucide/svelte";
+  import { PlayIcon, ClockIcon, Trash2Icon } from "@lucide/svelte";
   import * as Table from "$lib/components/ui/table";
   import { player, type Track } from "$lib/stores/player.svelte";
   import Image from "$lib/components/ui/image.svelte";
+  import { Button } from "$lib/components/ui/button";
 
   let {
     songs,
@@ -11,6 +12,7 @@
     playWithUpNext = false,
     showHeader = true,
     showTime = true,
+    onDeleteTrack,
   }: {
     songs: Track[];
     limit?: number;
@@ -18,6 +20,7 @@
     playWithUpNext?: boolean;
     showHeader?: boolean;
     showTime?: boolean;
+    onDeleteTrack?: (song: Track, index: number) => void | Promise<void>;
   } = $props();
 
   let currentTrack = $derived(player.currentTrack);
@@ -47,13 +50,19 @@
             ><ClockIcon class="size-4 inline" /></Table.Head
           >
         {/if}
+        {#if onDeleteTrack}
+          <Table.Head class="w-12"></Table.Head>
+        {/if}
       </Table.Row>
     </Table.Header>
   {/if}
   <Table.Body>
     {#each songs.slice(0, limit) as song, index}
       {@const isCurrent = currentTrack?.videoId === song.videoId}
-      <Table.Row class="group cursor-pointer" onclick={() => playTrack(index)}>
+      <Table.Row
+        class="group/item cursor-pointer"
+        onclick={() => playTrack(index)}
+      >
         <Table.Cell class="max-w-0">
           <div class="flex items-center gap-3 min-w-0">
             {#if showThumbnails && song.thumbnail}
@@ -101,6 +110,21 @@
               : ''}"
           >
             {formatDuration(song.duration)}
+          </Table.Cell>
+        {/if}
+        {#if onDeleteTrack}
+          <Table.Cell class="w-12 p-0 text-center">
+            <Button
+              size="icon"
+              variant="ghost"
+              class="opacity-0 group-hover/item:opacity-100 transition-opacity hover:bg-destructive/10 hover:text-destructive size-8 rounded-lg"
+              onclick={(e) => {
+                e.stopPropagation();
+                onDeleteTrack?.(song, index);
+              }}
+            >
+              <Trash2Icon class="size-4" />
+            </Button>
           </Table.Cell>
         {/if}
       </Table.Row>

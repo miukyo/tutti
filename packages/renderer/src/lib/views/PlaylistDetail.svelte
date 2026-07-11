@@ -3,12 +3,14 @@
   import { ScrollArea } from "$lib/components/ui/scroll-area";
   import { ytmusic } from "@app/preload";
   import type { PlaylistFull, VideoDetailed } from "@app/api/src";
-  import { PlayIcon } from "@lucide/svelte";
+  import { PlayIcon, Trash2Icon } from "@lucide/svelte";
   import { Button } from "$lib/components/ui/button";
   import { player, type Track } from "$lib/stores/player.svelte";
   import SongTable from "$lib/components/song-table.svelte";
   import Image from "$lib/components/ui/image.svelte";
   import { Spinner } from "$lib/components/ui/spinner";
+  import { replace } from "svelte-spa-router";
+  import * as AlertDialog from "$lib/components/ui/alert-dialog";
 
   let { params }: { params: { id: string } } = $props();
 
@@ -42,12 +44,46 @@
       artistId: v.artist?.artistId,
       thumbnail: v.thumbnails?.at(0)?.url || "",
       duration: v.duration,
+      setVideoId: v.setVideoId,
     }));
   });
 
   function playPlaylist() {
     if (queue.length > 0) {
       player.playTrack(queue[0], queue);
+    }
+  }
+
+  async function handleDeleteTrack(song: Track, index: number) {
+    if (!song.setVideoId) {
+      console.warn("Cannot delete track: setVideoId is missing.");
+      return;
+    }
+    try {
+      await ytmusic.removePlaylistItems(params.id, [
+        {
+          setVideoId: song.setVideoId,
+          removedVideoId: song.videoId,
+        },
+      ]);
+      videos = videos.filter((_, i) => i !== index);
+    } catch (e) {
+      console.error("Failed to delete track from playlist:", e);
+    }
+  }
+
+  let isDeleteAlertOpen = $state(false);
+
+  async function confirmDeletePlaylist() {
+    if (!playlist) return;
+    try {
+      loading = true;
+      await ytmusic.deletePlaylist(params.id);
+      window.dispatchEvent(new CustomEvent("playlists-changed"));
+      replace("/library");
+      loading = false;
+    } catch (e) {
+      console.error("Failed to delete playlist:", e);
     }
   }
 </script>
@@ -94,16 +130,56 @@
             {/if}
             <span>{playlist.videoCount || videos.length} tracks</span>
           </div>
-          <div class="flex items-center gap-4 mt-4">
+          <div class="flex items-center gap-2 mt-4">
             <Button size="lg" class="rounded-full gap-2" onclick={playPlaylist}>
               <PlayIcon class="size-5 fill-current" /> Play
             </Button>
+            {#if playlist.editable}
+              <Button
+                size="lg"
+                variant="outline"
+                class="rounded-full gap-2"
+                onclick={() => (isDeleteAlertOpen = true)}
+              >
+                <Trash2Icon class="size-5" /> Delete
+              </Button>
+
+              <AlertDialog.Root bind:open={isDeleteAlertOpen}>
+                <AlertDialog.Content>
+                  <AlertDialog.Header>
+                    <AlertDialog.Title
+                      >Are you absolutely sure?</AlertDialog.Title
+                    >
+                    <AlertDialog.Description>
+                      This action cannot be undone. This will permanently delete
+                      the playlist "{playlist.name}".
+                    </AlertDialog.Description>
+                  </AlertDialog.Header>
+                  <AlertDialog.Footer>
+                    <AlertDialog.Cancel>Cancel</AlertDialog.Cancel>
+                    <AlertDialog.Action
+                      onclick={confirmDeletePlaylist}
+                      class="bg-primary hover:bg-primary/90 text-primary-foreground"
+                    >
+                      {#if loading}
+                        <Spinner variant="circle" />
+                      {:else}
+                        Delete
+                      {/if}
+                    </AlertDialog.Action>
+                  </AlertDialog.Footer>
+                </AlertDialog.Content>
+              </AlertDialog.Root>
+            {/if}
           </div>
         </div>
       </div>
 
       <div class="w-full">
-        <SongTable songs={queue} />
+        <SongTable
+          songs={queue}
+          onDeleteTrack={playlist?.editable ? handleDeleteTrack : undefined}
+        />
       </div>
     {:else}
       <div class="flex items-center justify-center h-64">

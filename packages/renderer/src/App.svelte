@@ -27,6 +27,7 @@
     RefreshCwIcon,
     CaseSensitiveIcon,
     GaugeIcon,
+    PlusIcon,
   } from "@lucide/svelte/icons";
   import {
     ytmusic,
@@ -34,9 +35,12 @@
     platform,
     checkForUpdates,
     getAppVersion,
+    restartAndInstall,
+    onUpdateDownloaded,
   } from "@app/preload";
   import { Button } from "$lib/components/ui/button";
   import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
+  import * as Dialog from "$lib/components/ui/dialog";
   import Home from "$lib/views/Home.svelte";
   import * as ButtonGroup from "$lib/components/ui/button-group";
   import Glow from "$lib/components/ui/glow.svelte";
@@ -60,17 +64,18 @@
   import Lyrics from "$lib/components/lyrics.svelte";
   import ExtendedPlayer from "$lib/components/extended-player.svelte";
   import * as Select from "$lib/components/ui/select";
+  import CreatePlaylistDialog from "$lib/components/create-playlist-dialog.svelte";
 
   let accountInfo = $state<AccountInfo | null>(null);
   let sidebarPlaylists = $state<PlaylistDetailed[]>([]);
   let appVersion = $state("1.0.0");
 
   let updateStatus = $state<
-    "idle" | "checking" | "available" | "not-available" | "error"
+    "idle" | "checking" | "available" | "downloaded" | "not-available" | "error"
   >("idle");
   let updateVersion = $state<string | null>(null);
   let updateErrorMessage = $state<string | null>(null);
-
+  let isCreatePlaylistOpen = $state(false);
   async function handleCheckForUpdates() {
     updateStatus = "checking";
     updateVersion = null;
@@ -94,25 +99,56 @@
     }
   }
 
-  onMount(async () => {
+  onMount(() => {
     player.init();
-    try {
-      appVersion = await getAppVersion();
-    } catch (e) {
-      console.warn("Failed to get app version:", e);
-    }
-    try {
-      const info = await ytmusic.getAccountInfo();
-      if (info && info.accountName) {
-        accountInfo = info;
+
+    const unsubscribeUpdate = onUpdateDownloaded((info) => {
+      updateStatus = "downloaded";
+      updateVersion = info.version || null;
+    });
+
+    const handleResize = () => {
+      innerWidth = window.innerWidth;
+    };
+    window.addEventListener("resize", handleResize);
+
+    const refreshPlaylists = async () => {
+      try {
         sidebarPlaylists = await ytmusic.getLibraryPlaylists(100);
+        console.log(sidebarPlaylists);
+      } catch (e) {
+        console.warn("Failed to refresh sidebar playlists:", e);
       }
-    } catch (e) {
-      console.warn("Failed to fetch sidebar playlists:", e);
+    };
+    window.addEventListener("playlists-changed", refreshPlaylists);
+
+    async function loadInitialData() {
+      try {
+        appVersion = await getAppVersion();
+      } catch (e) {
+        console.warn("Failed to get app version:", e);
+      }
+      try {
+        const info = await ytmusic.getAccountInfo();
+        if (info && info.accountName) {
+          accountInfo = info;
+          await refreshPlaylists();
+        }
+      } catch (e) {
+        console.warn("Failed to fetch sidebar playlists:", e);
+      }
     }
+
+    loadInitialData();
+
+    return () => {
+      unsubscribeUpdate();
+      window.removeEventListener("resize", handleResize);
+      window.removeEventListener("playlists-changed", refreshPlaylists);
+    };
   });
 
-  let innerWidth = $state(0);
+  let innerWidth = $state(window.innerWidth);
   let leftSideWidth = $derived(Math.ceil((300 / innerWidth) * 100));
   let rightSideWidth = $derived(Math.ceil((400 / innerWidth) * 100));
 
@@ -140,7 +176,6 @@
   let showAboutModal = $state(false);
 </script>
 
-<svelte:window bind:innerWidth />
 <div
   class="absolute w-screen h-[32px] left-0 top-0"
   style="app-region: drag;"
@@ -150,13 +185,9 @@
     <ExtendedPlayer />
   {:else}
     <Resizable.PaneGroup direction="horizontal" autoSaveId="layout:main">
-      <Resizable.Pane
-        minSize={leftSideWidth * 0.7}
-        defaultSize={leftSideWidth * 0.8}
-        maxSize={leftSideWidth}
-      >
+      <div class="w-60">
         <div
-          class="flex flex-col p-2 gap-2 h-full relative overflow-visible"
+          class="flex flex-col p-2 pr-0 gap-2 h-full relative overflow-visible"
           class:pt-14={platform === "darwin"}
         >
           <SearchInput />
@@ -232,6 +263,18 @@
                 Playlists
               </p>
               <div class="flex flex-col gap-1 mb-30">
+                <Button
+                  class="justify-start gap-4 [.active]:bg-primary [.active]:text-primary-foreground shadow-glass hover:shadow-glass-hover"
+                  variant="ghost"
+                  size="lg"
+                  onclick={() => {
+                    isCreatePlaylistOpen = true;
+                  }}
+                >
+                  <PlusIcon />
+                  <span class="truncate">Create Playlist</span>
+                </Button>
+                <CreatePlaylistDialog bind:open={isCreatePlaylistOpen} />
                 {#each sidebarPlaylists as playlist}
                   <Button
                     href="/playlist/{playlist.playlistId}"
@@ -239,20 +282,6 @@
                     variant="ghost"
                     size="lg"
                   >
-                    <!-- <div
-                    class="size-6 shrink-0 rounded-md flex items-center justify-center overflow-hidden"
-                  >
-                    {#if playlist.thumbnails?.[0]?.url}
-                      <img
-                        src={playlist.thumbnails[0].url}
-                        alt={playlist.name}
-                        class="w-full h-full object-cover"
-                      />
-                    {:else}
-                      <ListIcon class="w-5 h-5 text-white" />
-                    {/if}
-                  </div> -->
-
                     <FolderOpenIcon />
 
                     <span class="truncate">{playlist.name}</span>
@@ -319,9 +348,9 @@
             {/if}
           </div>
         </div>
-      </Resizable.Pane>
-      <Resizable.Handle />
-      <Resizable.Pane class="p-2 relative">
+      </div>
+      <!-- <Resizable.Handle /> -->
+      <Resizable.Pane id="mid" class="p-2 relative">
         <div
           class="relative overflow-hidden bg-card/50 size-full rounded-[1.6rem] border border-border"
         >
@@ -441,8 +470,8 @@
               <ButtonGroup.Root
                 class="rounded-full bg-background/50 backdrop-blur-sm border border-border h-10 items-center flex gap-1 p-1 shadow-glass hover:shadow-glass-hover transition-shadow overflow-hidden"
                 style="app-region: no-drag;"
+                data-glow
               >
-                <Glow />
                 <Button
                   variant="link"
                   size="icon-sm"
@@ -468,8 +497,8 @@
               <ButtonGroup.Root
                 class="rounded-full bg-background/50 backdrop-blur-sm  border border-border h-10 items-center flex gap-1 p-1 shadow-glass hover:shadow-glass-hover transition-shadow overflow-hidden"
                 style="app-region: no-drag;"
+                data-glow
               >
-                <Glow />
                 <Button
                   variant="link"
                   size="icon-sm"
@@ -503,11 +532,7 @@
       </Resizable.Pane>
       {#if activeSidebar !== "none"}
         <Resizable.Handle />
-        <Resizable.Pane
-          minSize={rightSideWidth * 0.5}
-          defaultSize={rightSideWidth * 0.7}
-          maxSize={rightSideWidth}
-        >
+        <Resizable.Pane id="right" minSize={20} defaultSize={20} maxSize={30}>
           <div class="size-full overflow-hidden relative">
             {#if activeSidebar === "queue"}
               <h2 class="text-lg font-bold absolute pt-4 px-2 z-10">Queue</h2>
@@ -537,8 +562,8 @@
                 <Select.Root type="single" bind:value={player.selectedSource}>
                   <Select.Trigger
                     class="w-[150px] shadow-glass bg-background/50 border border-border backdrop-blur-md rounded-full focus-visible:ring-0 overflow-hidden"
+                    data-glow
                   >
-                    <Glow />
                     {player.selectedSource === "Auto"
                       ? "Auto (Default)"
                       : player.selectedSource}
@@ -567,31 +592,28 @@
       {/if}
     </Resizable.PaneGroup>
   {/if}
-  {#if showAboutModal}
-    <!-- svelte-ignore a11y_click_events_have_key_events -->
-    <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <div
-      class="fixed inset-0 z-200 bg-background/80 backdrop-blur-md flex items-center justify-center"
-      onclick={() => (showAboutModal = false)}
-    >
-      <div
-        class="bg-card border border-border p-6 rounded-3xl w-80 shadow-glass flex flex-col gap-4 relative animate-in fade-in-0 zoom-in-95"
-        onclick={(e) => e.stopPropagation()}
-      >
+  <Dialog.Root bind:open={showAboutModal}>
+    <Dialog.Content class="sm:max-w-80">
+      <Dialog.Header class="items-center">
+        <Dialog.Title class="sr-only">About Tutti</Dialog.Title>
         <img src="icon.png" alt="Tutti" class="size-32 mx-auto" />
-        <p class="text-sm text-center text-muted-foreground">
-          Tutti is a beautifully designed desktop client for YouTube Music
-        </p>
-
-        <div
-          class="flex flex-col gap-1 text-xs text-muted-foreground border-t border-border/50 pt-3"
+        <Dialog.Description
+          class="text-sm text-center text-muted-foreground mt-2"
         >
-          <div>Version: {appVersion}</div>
-          <div>Electron: {versions.electron || "N/A"}</div>
-          <div>Chrome: {versions.chrome || "N/A"}</div>
-          <div>Node: {versions.node || "N/A"}</div>
-        </div>
+          Tutti is a beautifully designed desktop client for YouTube Music
+        </Dialog.Description>
+      </Dialog.Header>
 
+      <div
+        class="flex flex-col gap-1 text-xs text-muted-foreground border-t border-border/50 pt-3"
+      >
+        <div>Version: {appVersion}</div>
+        <div>Electron: {versions.electron || "N/A"}</div>
+        <div>Chrome: {versions.chrome || "N/A"}</div>
+        <div>Node: {versions.node || "N/A"}</div>
+      </div>
+
+      <div class="flex flex-col gap-2">
         <div class="border-t border-border/50 pt-3 flex flex-col gap-0">
           {#if updateStatus === "idle"}
             <Button
@@ -618,6 +640,18 @@
             <p class="text-[10px] text-center text-muted-foreground/80">
               Downloading in background...
             </p>
+          {:else if updateStatus === "downloaded"}
+            <div class="text-xs text-center text-emerald-500 font-semibold">
+              New version {updateVersion || ""} is ready!
+            </div>
+            <Button
+              variant="default"
+              size="sm"
+              onclick={restartAndInstall}
+              class="w-full rounded-2xl mt-1.5"
+            >
+              Restart & Install
+            </Button>
           {:else if updateStatus === "not-available"}
             <div class="text-xs text-center text-muted-foreground">
               You are up to date!
@@ -646,6 +680,7 @@
           Close
         </Button>
       </div>
-    </div>
-  {/if}
+    </Dialog.Content>
+  </Dialog.Root>
+  <Glow />
 </section>

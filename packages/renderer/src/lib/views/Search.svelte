@@ -179,7 +179,11 @@
 
         <!-- Videos -->
         {#if (activeFilter === "All" || activeFilter === "Videos") && videos.length > 0}
-          <div class={activeFilter === "All" ? "min-h-[305px]" : "px-6 mb-4"}>
+          <div
+            class={activeFilter === "All"
+              ? "min-h-[305px]"
+              : "px-6 mb-4 overflow-hidden"}
+          >
             {#if activeFilter === "All"}
               <h2 class="px-6 text-xl font-bold">Videos</h2>
               <RowSection contents={videos} />

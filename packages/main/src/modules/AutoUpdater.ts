@@ -1,6 +1,6 @@
 import {AppModule} from '../AppModule.js';
 import electronUpdater, {type AppUpdater, type Logger} from 'electron-updater';
-import { ipcMain } from 'electron';
+import { ipcMain, BrowserWindow } from 'electron';
 
 type DownloadNotification = Parameters<AppUpdater['checkForUpdatesAndNotify']>[0];
 
@@ -24,9 +24,9 @@ export class AutoUpdater implements AppModule {
   }
 
   async enable(): Promise<void> {
+    const updater = this.getAutoUpdater();
+
     ipcMain.handle('check-for-updates', async () => {
-      const updater = this.getAutoUpdater();
-      
       return new Promise((resolve) => {
         let resolved = false;
         
@@ -65,6 +65,17 @@ export class AutoUpdater implements AppModule {
           onError(err);
         });
       });
+    });
+
+    ipcMain.handle('restart-and-install', () => {
+      updater.quitAndInstall();
+    });
+
+    updater.on('update-downloaded', (info) => {
+      const window = BrowserWindow.getAllWindows().find(w => !w.isDestroyed());
+      if (window) {
+        window.webContents.send('update-downloaded', info);
+      }
     });
 
     await this.runAutoUpdater();

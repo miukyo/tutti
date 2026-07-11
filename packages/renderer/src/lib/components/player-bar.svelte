@@ -12,13 +12,15 @@
     ThumbsUpIcon,
     Volume2Icon,
     VolumeXIcon,
+    BookmarkIcon,
+    BookmarkPlusIcon,
   } from "@lucide/svelte";
   import Button from "./ui/button/button.svelte";
   import Slider from "./ui/slider/slider.svelte";
   import { player } from "$lib/stores/player.svelte";
   import Image from "./ui/image.svelte";
   import { Spinner } from "$lib/components/ui/spinner";
-  import Glow from "./ui/glow.svelte";
+  import AddToPlaylistDialog from "./add-to-playlist-dialog.svelte";
 
   function formatTime(seconds: number): string {
     if (isNaN(seconds)) return "0:00";
@@ -36,6 +38,7 @@
   let currentTrack = $derived(player.currentTrack);
   let isShuffled = $derived(player.isShuffled);
   let repeatMode = $derived(player.repeatMode);
+  let likeStatus = $derived(player.likeStatus);
 
   let isDragging = $state(false);
   let sliderValue = $state(0);
@@ -45,6 +48,8 @@
       sliderValue = currentTime;
     }
   });
+
+  let isDialogOpened = $state(false);
 
   let {
     isExtended = false,
@@ -56,7 +61,7 @@
 <div class="absolute bottom-0 p-4 w-full select-none z-50">
   <div
     class="flex justify-between gap-4 {isExtended
-      ? 'justify-center'
+      ? ''
       : 'border border-border bg-background/50 backdrop-blur-sm shadow-glass'} p-4 rounded-4xl items-center relative"
   >
     <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -68,7 +73,7 @@
         }}
       >
         <Slider
-          class="w-full h-2 -mt-1 **:data-[slot='slider-track']:bg-foreground/10 **:data-[slot='slider-track']:h-0.5 **:data-[slot='slider-track']:bg-transparent **:data-[slot='slider-thumb']:h-2 **:data-[slot='slider-thumb']:w-4 **:data-[slot='slider-thumb']:ring-0 **:data-[slot='slider-thumb']:bg-primary **:data-[slot='slider-thumb']:scale-0 **:data-[slot='slider-thumb']:group-hover:scale-100 **:data-[slot='slider-thumb']:transition-[scale]"
+          class="w-full h-2 -mt-1 **:data-[slot='slider-track']:h-0.5 **:data-[slot='slider-track']:bg-transparent **:data-[slot='slider-thumb']:h-2 **:data-[slot='slider-thumb']:w-4 **:data-[slot='slider-thumb']:ring-0 **:data-[slot='slider-thumb']:bg-primary **:data-[slot='slider-thumb']:scale-0 **:data-[slot='slider-thumb']:group-hover:scale-100 **:data-[slot='slider-thumb']:transition-[scale]"
           type="single"
           orientation="horizontal"
           value={sliderValue}
@@ -88,7 +93,7 @@
         />
       </div>
     {/if}
-    <div class="flex items-center">
+    <div class="flex items-center order-2">
       <Button
         size="icon-sm"
         variant="link"
@@ -148,15 +153,15 @@
     <!-- Center playback & track info -->
     {#if !isExtended}
       <div
-        class="absolute w-1/3 h-full top-0 left-1/2 -translate-x-1/2 py-2 flex flex-col justify-center"
+        class="absolute w-1/3 h-full top-0 left-1/2 -translate-x-1/2 py-2 flex flex-col justify-center order-3"
       >
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div
           class="w-full flex items-center justify-between gap-2 bg-foreground/5 pl-1.5 pr-3 h-14 rounded-2xl border border-border/50 cursor-pointer group relative overflow-hidden shadow-glass"
+          data-glow
           onclick={() => currentTrack && (player.showExtended = true)}
         >
-          <Glow />
 
           {#if currentTrack}
             <div class="flex gap-2 items-center min-w-0">
@@ -197,8 +202,14 @@
       </div>
     {/if}
 
-    {#if !isExtended}
-      <div class="flex items-center gap-2">
+    <div
+      class="flex items-center gap-2 group transition-opacity max-w-60"
+      class:order-1={isExtended}
+      class:opacity-20={isExtended}
+      class:hover:opacity-100={isExtended}
+      class:order-4={!isExtended}
+    >
+      <div class="flex items-center gap-2 group/volume peer/slider order-5">
         <Button size="icon" variant="link" onclick={() => player.toggleMute()}>
           {#if isMuted}
             <VolumeXIcon class="size-5" fill="currentColor" />
@@ -206,9 +217,9 @@
             <Volume2Icon class="size-5" fill="currentColor" />
           {/if}
         </Button>
-        <!-- Svelte 5 slider volume bindings -->
         <Slider
-          class="w-30  **:data-slider-thumb:w-0 **:data-slider-thumb:opacity-0  **:data-[slot='slider-track']:bg-foreground/10"
+          class="w-0 2xl:w-30 2xl:opacity-100 opacity-0 group-hover/volume:w-30 group-hover:opacity-100 transition-all duration-300 overflow-hidden
+          **:data-slider-thumb:w-0 **:data-slider-thumb:opacity-0  **:data-[slot='slider-track']:bg-foreground/10"
           type="single"
           orientation="horizontal"
           value={player.isMuted ? 0 : player.volume}
@@ -223,6 +234,35 @@
           step={1}
         />
       </div>
+
+      <Button
+        size="icon"
+        variant="link"
+        disabled={!currentTrack}
+        class="active:scale-60 -mr-3 max-2xl:peer-hover/slider:scale-0 max-2xl:peer-hover/slider:opacity-0 transition-all duration-300"
+        onclick={() => player.toggleLike()}
+      >
+        <ThumbsUpIcon
+          class="size-5"
+          fill={player.likeStatus === "Like" ? "currentColor" : "none"}
+        />
+      </Button>
+      <Button
+        size="icon"
+        variant="link"
+        class="active:scale-60 -mr-2  max-xl:peer-hover/slider:scale-0 max-xl:peer-hover/slider:opacity-0 transition-all duration-300"
+        disabled={!currentTrack}
+        onclick={() => (isDialogOpened = true)}
+      >
+        <BookmarkPlusIcon class="size-5" />
+      </Button>
+
+      <!-- Svelte 5 slider volume bindings -->
+    </div>
+    {#if isExtended}
+      <div class="order-5 w-11"></div>
     {/if}
   </div>
 </div>
+
+<AddToPlaylistDialog bind:open={isDialogOpened} />

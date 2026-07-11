@@ -36,7 +36,7 @@ export function parse(data: any): SongFull {
   };
 }
 
-export function parseSearchResult(item: any): SearchResult {
+export function parseSearchResult(item: any): SearchResult | null {
   const columns = traverseList(item, 'flexColumns');
 
   const title = columns.length > 0 ? traverseList(columns[0], 'runs')[0] : null;
@@ -45,7 +45,7 @@ export function parseSearchResult(item: any): SearchResult {
 
   const durationText = durationNode ? traverseString(durationNode, 'text') : null;
   const type = traverseString(item, 'navigationEndpoint', 'watchEndpoint', 'musicVideoType');
-  
+
   let albumBasic: AlbumBasic | null = null;
   if (album) {
     albumBasic = {
@@ -55,8 +55,12 @@ export function parseSearchResult(item: any): SearchResult {
   }
 
   const subtitleRuns = traverseList(columns[1], 'runs');
-  const artistName = subtitleRuns.length > 0 ? traverseString(subtitleRuns[0], 'text') : '';
-  const artistId = subtitleRuns.length > 0 ? traverseString(subtitleRuns[0], 'browseId') : null;
+  const artistRun = subtitleRuns.find(run => run && run.navigationEndpoint);
+  const targetRun = artistRun || (subtitleRuns.length > 0 ? subtitleRuns[0] : null);
+  const artistName = targetRun ? traverseString(targetRun, 'text') : '';
+  const artistId = targetRun ? traverseString(targetRun, 'browseId') : null;
+
+  if (artistName === "Song") return null;
 
   if (type === 'MUSIC_VIDEO_TYPE_ATV') {
     return {

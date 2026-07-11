@@ -13,9 +13,9 @@
     variants: {
       variant: {
         default:
-          "bg-primary text-primary-foreground shadow-glass hover:shadow-glass-hover",
+          "bg-primary text-primary-foreground shadow-glass hover:shadow-glass-hover hover:bg-primary/90",
         outline:
-          "border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground shadow-glass hover:shadow-glass-hover",
+          "border-border hover:bg-foreground/10 hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground shadow-glass hover:shadow-glass-hover",
         "outline-blur":
           "text-foreground border border-border bg-background/50 backdrop-blur-sm shadow-glass hover:shadow-glass-hover",
         secondary:
@@ -66,8 +66,6 @@
 </script>
 
 <script lang="ts">
-  import Glow from "$lib/components/ui/glow.svelte";
-
   let {
     class: className,
     variant = "default",
@@ -88,6 +86,7 @@
     use:link
     use:active
     data-slot="button"
+    data-glow={variant !== "link" ? "" : undefined}
     class={cn(
       buttonVariants({ variant, size, "active-scale": activeScale }),
       variant !== "link" && "relative overflow-hidden",
@@ -99,15 +98,13 @@
     tabindex={disabled ? -1 : undefined}
     {...restProps}
   >
-    {#if variant !== "link"}
-      <Glow />
-    {/if}
     {@render children?.()}
   </a>
 {:else}
   <button
     bind:this={ref}
     data-slot="button"
+    data-glow={variant !== "link" ? "" : undefined}
     class={cn(
       buttonVariants({ variant, size, "active-scale": activeScale }),
       variant !== "link" && "relative overflow-hidden",
@@ -117,9 +114,6 @@
     {disabled}
     {...restProps}
   >
-    {#if variant !== "link"}
-      <Glow />
-    {/if}
     {@render children?.()}
   </button>
 {/if}

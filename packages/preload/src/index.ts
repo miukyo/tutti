@@ -83,4 +83,16 @@ function getAppVersion(): Promise<string> {
   return ipcRenderer.invoke('get-app-version');
 }
 
-export { sha256sum, versions, platform, send, ytmusic, checkForUpdates, getAppVersion };
+function restartAndInstall(): Promise<void> {
+  return ipcRenderer.invoke('restart-and-install');
+}
+
+function onUpdateDownloaded(callback: (info: any) => void): () => void {
+  const listener = (_event: any, info: any) => callback(info);
+  ipcRenderer.on('update-downloaded', listener);
+  return () => {
+    ipcRenderer.off('update-downloaded', listener);
+  };
+}
+
+export { sha256sum, versions, platform, send, ytmusic, checkForUpdates, getAppVersion, restartAndInstall, onUpdateDownloaded };

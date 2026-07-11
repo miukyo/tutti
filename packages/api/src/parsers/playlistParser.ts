@@ -17,6 +17,8 @@ export function parse(data: any, playlistId: string): PlaylistFull {
     }
   }
 
+  const isEditable = traverse(data, 'musicEditablePlaylistDetailHeaderRenderer') !== null;
+
   return {
     type: 'PLAYLIST',
     playlistId,
@@ -26,7 +28,8 @@ export function parse(data: any, playlistId: string): PlaylistFull {
       artistId: artistId || null
     },
     videoCount,
-    thumbnails: parseThumbnails(data, 'tabs', 'thumbnails')
+    thumbnails: parseThumbnails(data, 'tabs', 'thumbnails'),
+    editable: isEditable
   };
 }
 
@@ -72,16 +75,43 @@ export function parseMoodPlaylist(item: any): PlaylistDetailed | null {
   };
 }
 
-export function parseLibraryPlaylist(item: any): PlaylistDetailed | null {
+export function parseLibraryPlaylist(item: any, ownerName: string | null = null): PlaylistDetailed | null {
   const title = item ? traverseString(item, 'musicTwoRowItemRenderer', 'title', 'runs', 'text') : null;
   if (!title) return null;
 
+  const subtitleRuns = traverseList(item, 'musicTwoRowItemRenderer', 'subtitle', 'runs');
+  let isCreatorPlaylist = false;
+
+  if (ownerName) {
+    const hasOwnerName = subtitleRuns.some(run => {
+      const text = traverseString(run, 'text').trim().toLowerCase();
+      return text === ownerName.trim().toLowerCase();
+    });
+    const hasAnyOtherName = subtitleRuns.some(run => {
+      const text = traverseString(run, 'text').trim();
+      const browseId = traverseString(run, 'navigationEndpoint', 'browseEndpoint', 'browseId');
+      return browseId !== '' && text.toLowerCase() !== ownerName.trim().toLowerCase();
+    });
+    isCreatorPlaylist = hasOwnerName || !hasAnyOtherName;
+  } else {
+    const hasBrowseLink = subtitleRuns.some(run =>
+      traverseString(run, 'navigationEndpoint', 'browseEndpoint', 'browseId') !== ''
+    );
+    isCreatorPlaylist = !hasBrowseLink;
+  }
+
+  const playlistId = traverseString(item, 'musicTwoRowItemRenderer', 'navigationEndpoint', 'browseEndpoint', 'browseId')
+  if (playlistId === "VLLM" || playlistId === "VLSS" || playlistId === "VLSE") {
+    isCreatorPlaylist = false;
+  }
+
   return {
     type: 'PLAYLIST',
-    playlistId: traverseString(item, 'musicTwoRowItemRenderer', 'navigationEndpoint', 'browseEndpoint', 'browseId'),
+    playlistId: playlistId,
     name: title,
     artist: { name: '', artistId: null },
-    thumbnails: parseThumbnails(item, 'musicTwoRowItemRenderer', 'thumbnailRenderer', 'musicThumbnailRenderer', 'thumbnail', 'thumbnails')
+    thumbnails: parseThumbnails(item, 'musicTwoRowItemRenderer', 'thumbnailRenderer', 'musicThumbnailRenderer', 'thumbnail', 'thumbnails'),
+    editable: isCreatorPlaylist
   };
 }
 

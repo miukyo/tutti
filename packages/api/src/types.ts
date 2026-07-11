@@ -34,6 +34,7 @@ export interface VideoDetailed extends BaseSearchResult {
   videoId: string;
   artist: ArtistBasic;
   duration?: number | null;
+  setVideoId?: string | null;
 }
 
 export interface ArtistDetailed extends BaseSearchResult {
@@ -53,6 +54,7 @@ export interface PlaylistDetailed extends BaseSearchResult {
   type: 'PLAYLIST';
   playlistId: string;
   artist: ArtistBasic;
+  editable?: boolean;
 }
 
 export interface EpisodeDetailed extends BaseSearchResult {
@@ -136,6 +138,7 @@ export interface PlaylistFull {
   artist: ArtistBasic;
   videoCount: number;
   thumbnails: Thumbnail[];
+  editable?: boolean;
 }
 
 export interface HomeSection {

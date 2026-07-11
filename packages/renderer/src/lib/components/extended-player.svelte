@@ -16,7 +16,6 @@
   import Image from "./ui/image.svelte";
   import PlayerBar from "./player-bar.svelte";
   import * as Select from "./ui/select";
-  import Glow from "./ui/glow.svelte";
 
   let showExtended = $derived(player.showExtended);
   let currentTrack = $derived(player.currentTrack);
@@ -57,8 +56,8 @@
       <Select.Root type="single" bind:value={player.selectedSource}>
         <Select.Trigger
           class="w-[150px] shadow-glass bg-background/50 border border-border backdrop-blur-md rounded-full focus-visible:ring-0 overflow-hidden"
+          data-glow
         >
-          <Glow />
           {player.selectedSource === "Auto"
             ? "Auto (Default)"
             : player.selectedSource}
