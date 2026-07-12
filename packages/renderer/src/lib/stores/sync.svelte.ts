@@ -67,17 +67,18 @@ export class SyncStore {
           { urls: 'stun:stun.l.google.com:19302' },
           { urls: 'stun:stun1.l.google.com:19302' },
           { urls: 'stun:stun2.l.google.com:19302' },
+          { urls: ["stun:stun.cloudflare.com:3478", "stun:stun.cloudflare.com:53"] },
           {
             urls: [
-              'turn:openrelay.metered.ca:80',
-              'turn:openrelay.metered.ca:443',
-              'turn:openrelay.metered.ca:5349?transport=udp',
-              'turn:openrelay.metered.ca:5349?transport=tcp',
-              'turns:openrelay.metered.ca:443?transport=tcp',
-              'turns:openrelay.metered.ca:5349?transport=tcp'
+              "turn:turn.cloudflare.com:3478?transport=udp",
+              "turn:turn.cloudflare.com:3478?transport=tcp",
+              "turns:turn.cloudflare.com:5349?transport=tcp",
+              "turn:turn.cloudflare.com:53?transport=udp",
+              "turn:turn.cloudflare.com:80?transport=tcp",
+              "turns:turn.cloudflare.com:443?transport=tcp"
             ],
-            username: 'openrelayproject',
-            credential: 'openrelayproject'
+            username: import.meta.env.VITE_TURN_USERNAME || "",
+            credential: import.meta.env.VITE_TURN_CREDENTIAL || ""
           }
         ]
       },
@@ -158,17 +159,18 @@ export class SyncStore {
           { urls: 'stun:stun.l.google.com:19302' },
           { urls: 'stun:stun1.l.google.com:19302' },
           { urls: 'stun:stun2.l.google.com:19302' },
+          { urls: ["stun:stun.cloudflare.com:3478", "stun:stun.cloudflare.com:53"] },
           {
             urls: [
-              'turn:openrelay.metered.ca:80',
-              'turn:openrelay.metered.ca:443',
-              'turn:openrelay.metered.ca:5349?transport=udp',
-              'turn:openrelay.metered.ca:5349?transport=tcp',
-              'turns:openrelay.metered.ca:443?transport=tcp',
-              'turns:openrelay.metered.ca:5349?transport=tcp'
+              "turn:turn.cloudflare.com:3478?transport=udp",
+              "turn:turn.cloudflare.com:3478?transport=tcp",
+              "turns:turn.cloudflare.com:5349?transport=tcp",
+              "turn:turn.cloudflare.com:53?transport=udp",
+              "turn:turn.cloudflare.com:80?transport=tcp",
+              "turns:turn.cloudflare.com:443?transport=tcp"
             ],
-            username: 'openrelayproject',
-            credential: 'openrelayproject'
+            username: import.meta.env.VITE_TURN_USERNAME || "",
+            credential: import.meta.env.VITE_TURN_CREDENTIAL || ""
           }
         ]
       },
@@ -229,14 +231,14 @@ export class SyncStore {
     for (const conn of this.connections) {
       try {
         conn.close();
-      } catch {}
+      } catch { }
     }
     this.connections = [];
 
     if (this.peer) {
       try {
         this.peer.destroy();
-      } catch {}
+      } catch { }
       this.peer = null;
     }
 
