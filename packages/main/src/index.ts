@@ -9,6 +9,8 @@ import { allowInternalOrigins } from './modules/BlockNotAllowdOrigins.js';
 import { allowExternalUrls } from './modules/ExternalUrls.js';
 import { ytmusicModule } from './modules/YTMusicApiModule.js';
 import { garbageCollectorModule } from './modules/GarbageCollectorModule.js';
+import { discordPresenceModule } from './modules/DiscordPresence.js';
+import { deepLinkModule } from './modules/DeepLink.js';
 
 export async function initApp(initConfig: AppInitConfig) {
   app.name = 'Tutti';
@@ -26,6 +28,8 @@ export async function initApp(initConfig: AppInitConfig) {
     hardwareAccelerationMode({ enable: true }),
     autoUpdater(),
     ytmusicModule(),
+    discordPresenceModule(),
+    deepLinkModule(),
     allowInternalOrigins(
       new Set([
         ...(initConfig.renderer instanceof URL ? [initConfig.renderer.origin] : []),

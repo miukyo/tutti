@@ -37,5 +37,8 @@
     ".": {
       "default": "./dist/index.html"
     }
+  },
+  "dependencies": {
+    "peerjs": "^1.5.5"
   }
 }

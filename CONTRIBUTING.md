@@ -26,11 +26,10 @@ If you find a bug or have a suggestion for improvement:
 Prerequisites: Node.js >= 23.0.0
 
 ```bash
-git clone <repository-url>
-cd vite-electron-builder
-npm run init
+git clone https://github.com/miukyo/tutti.git
+cd tutti
+npm install
 ```
-The `npm run init` script scaffolds the renderer workspace, integrates Vite config flags, and installs project-wide dependencies.
 
 ### 2. Monorepo Workspace Operations
 

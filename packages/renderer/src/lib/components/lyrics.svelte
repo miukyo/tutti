@@ -16,7 +16,7 @@
   let userScrollOffset = $state(0);
   let userScrollingTimeout: any = null;
   let {
-    showInfo = true,
+    showInfo = false,
     isExtended = false,
   }: { showInfo?: boolean; isExtended?: boolean } = $props();
 
@@ -620,11 +620,11 @@
                   {/each}
                 </div>
                 {#if line.romanizedText}
-                  <div
-                    class="romanized-line text-foreground/30 text-[0.6em] font-bold leading-normal mt-1 select-none"
+                  <span
+                    class="romanized-line text-[0.6em] font-bold leading-normal mt-1 select-none transition-opacity"
                   >
                     {line.romanizedText}
-                  </div>
+                  </span>
                 {/if}
               </div>
             {:else}
@@ -647,11 +647,11 @@
                     {line.text}
                   </div>
                   {#if line.romanizedText}
-                    <div
-                      class="romanized-line text-muted-foreground/60 text-[0.6em] font-normal leading-normal mt-1 select-none"
+                    <span
+                      class="romanized-line text-[0.6em] font-bold leading-normal mt-1 select-none transition-opacity"
                     >
                       {line.romanizedText}
-                    </div>
+                    </span>
                   {/if}
                 {/if}
               </div>
@@ -814,5 +814,17 @@
 
   .lyric-line.is-instrumental.active {
     opacity: 0.8;
+  }
+
+  .lyric-line .romanized-line {
+    opacity: max(0.15, var(--opacity-amount) * 0.2);
+  }
+
+  .lyric-line.active .romanized-line {
+    opacity: 1;
+  }
+
+  .lyric-line.past .romanized-line {
+    opacity: max(0.15, var(--opacity-amount) * 0.8);
   }
 </style>

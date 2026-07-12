@@ -1,4 +1,4 @@
-import { ytmusic } from "@app/preload";
+import { ytmusic, updateDiscordPresence } from "@app/preload";
 import { tick } from "svelte";
 
 export interface Track {
@@ -22,6 +22,7 @@ class PlayerStore {
   duration = $state(0);
   volume = $state(50); // 0-100
   isMuted = $state(false);
+  discordPresenceEnabled = $state(true);
   #showExtended = $state(false);
   get showExtended() {
     return this.#showExtended;
@@ -46,13 +47,14 @@ class PlayerStore {
   likedSongsLoaded = $state(false);
   likedSongIds = $state<string[]>([]);
   isAuthed = $state<boolean | null>(null);
+  disableQueueControls = $state(false);
 
-  // Right sidebar tab state: 'none' | 'lyrics' | 'queue'
-  #activeSidebar = $state<'none' | 'lyrics' | 'queue'>('queue');
+  // Right sidebar tab state: 'none' | 'lyrics' | 'queue' | 'listen-together'
+  #activeSidebar = $state<'none' | 'lyrics' | 'queue' | 'listen-together'>('queue');
   get activeSidebar() {
     return this.#activeSidebar;
   }
-  set activeSidebar(val: 'none' | 'lyrics' | 'queue') {
+  set activeSidebar(val: 'none' | 'lyrics' | 'queue' | 'listen-together') {
     if (typeof document !== "undefined" && document.startViewTransition) {
       document.startViewTransition(async () => {
         this.#activeSidebar = val;
@@ -74,7 +76,7 @@ class PlayerStore {
     if (typeof window !== "undefined" && !this.audio) {
       this.audio = new Audio();
       this.loadState();
-      
+
       if (this.isAuthed === null) {
         ytmusic.getAccountInfo().then((info) => {
           if (info && info.accountName) {
@@ -253,6 +255,7 @@ class PlayerStore {
         const state = JSON.parse(saved);
         if (typeof state.volume === "number") this.volume = state.volume;
         if (typeof state.isMuted === "boolean") this.isMuted = state.isMuted;
+        if (typeof state.discordPresenceEnabled === "boolean") this.discordPresenceEnabled = state.discordPresenceEnabled;
         if (state.currentTrack) {
           this.currentTrack = state.currentTrack;
           this.likeStatus = this.likedSongIds.includes(state.currentTrack.videoId) ? 'Like' : 'Indifferent';
@@ -291,11 +294,83 @@ class PlayerStore {
         isShuffled: this.isShuffled,
         originalQueue: this.originalQueue,
         selectedSource: this.selectedSource,
+        discordPresenceEnabled: this.discordPresenceEnabled,
       };
       localStorage.setItem("tutti_player_state", JSON.stringify(state));
     } catch (e) {
       console.error("Failed to save player state:", e);
     }
+  }
+
+  updatePresence() {
+    if (typeof window === "undefined") return;
+    if (!this.discordPresenceEnabled || !this.currentTrack) {
+      updateDiscordPresence(null);
+      return;
+    }
+
+    let startTimestamp: number | undefined;
+    let endTimestamp: number | undefined;
+
+    if (this.isPlaying) {
+      const now = Date.now();
+      startTimestamp = now - Math.floor(this.currentTime * 1000);
+      if (this.duration) {
+        endTimestamp = startTimestamp + Math.floor(this.duration * 1000);
+      }
+    }
+
+    import("$lib/stores/sync.svelte").then(({ syncStore }) => {
+      const buttons = [
+        {
+          label: "Listen on YouTube Music",
+          url: `https://music.youtube.com/watch?v=${this.currentTrack!.videoId}`
+        }
+      ];
+
+      // if (syncStore.role === 'host' && syncStore.roomCode) {
+      //   buttons.push({
+      //     label: "Listen Together",
+      //     url: `https://tutti.miukyo.my.id/join?room=${syncStore.roomCode}`
+      //   });
+      // }
+
+      // waiting for homepage website to be live
+
+
+      updateDiscordPresence({
+        state: this.currentTrack!.artist,
+        details: this.currentTrack!.name,
+        startTimestamp,
+        endTimestamp,
+        largeImageKey: this.currentTrack!.thumbnail,
+        buttons
+      });
+    });
+  }
+
+  syncStateToPeers() {
+    if (typeof window !== "undefined") {
+      import("$lib/stores/sync.svelte").then(({ syncStore }) => {
+        if (syncStore.role === 'host') {
+          syncStore.broadcast({
+            type: 'sync',
+            track: this.currentTrack,
+            isPlaying: this.isPlaying,
+            currentTime: this.currentTime,
+            queue: this.queue,
+            currentIndex: this.currentIndex,
+            sentAt: Date.now()
+          });
+        }
+      });
+    }
+  }
+
+  toggleDiscordPresence() {
+    this.discordPresenceEnabled = !this.discordPresenceEnabled;
+    this.saveState();
+    this.updatePresence();
   }
 
   setVolume(val: number) {
@@ -315,6 +390,7 @@ class PlayerStore {
   }
 
   toggleShuffle() {
+    if (this.disableQueueControls) return;
     this.isShuffled = !this.isShuffled;
     if (this.isShuffled) {
       this.originalQueue = [...this.queue];
@@ -347,6 +423,7 @@ class PlayerStore {
   }
 
   toggleRepeat() {
+    if (this.disableQueueControls) return;
     if (this.repeatMode === 'off') {
       this.repeatMode = 'all';
     } else if (this.repeatMode === 'all') {
@@ -416,7 +493,7 @@ class PlayerStore {
     }
   }
 
-  async #fetchAndPlayStream(track: Track, startTime: number, signal: AbortSignal): Promise<void> {
+  async #fetchAndPlayStream(track: Track, startTime: number, signal: AbortSignal, autoPlay: boolean = true): Promise<void> {
     const manifest = await ytmusic.getStreamManifest(track.videoId);
     if (signal.aborted || this.currentTrack?.videoId !== track.videoId) return;
 
@@ -431,7 +508,7 @@ class PlayerStore {
 
     this.audio.src = bestStream.url;
 
-    if (startTime > 0) {
+    if (startTime > 0 || !autoPlay) {
       await new Promise<void>((resolve, reject) => {
         let cleanedUp = false;
         const cleanup = () => {
@@ -445,7 +522,12 @@ class PlayerStore {
           cleanup();
           if (this.audio && !signal.aborted && this.currentTrack?.videoId === track.videoId) {
             this.audio.currentTime = startTime;
-            this.audio.play().then(resolve).catch(reject);
+            if (autoPlay) {
+              this.audio.play().then(resolve).catch(reject);
+            } else {
+              this.audio.pause();
+              resolve();
+            }
           } else {
             reject(new Error("Track changed or audio is null"));
           }
@@ -463,12 +545,14 @@ class PlayerStore {
       await this.audio.play();
     }
 
-    this.isPlaying = true;
+    this.isPlaying = autoPlay;
     this.saveState();
     this.#updateMediaSessionPlaybackState();
+    this.updatePresence();
+    this.syncStateToPeers();
   }
 
-  async #startStreamPlayback(track: Track, startTime: number, signal: AbortSignal): Promise<void> {
+  async #startStreamPlayback(track: Track, startTime: number, signal: AbortSignal, autoPlay: boolean = true): Promise<void> {
     const maxRetries = 3;
     let attempt = 0;
     let success = false;
@@ -477,8 +561,8 @@ class PlayerStore {
       if (signal.aborted || this.currentTrack?.videoId !== track.videoId) return;
 
       try {
-        await this.#fetchAndPlayStream(track, startTime, signal);
-        if (startTime === 0) {
+        await this.#fetchAndPlayStream(track, startTime, signal, autoPlay);
+        if (startTime === 0 && autoPlay) {
           ytmusic.addHistoryItem(track.videoId).catch((err) => {
             console.error("Failed to add history item:", err);
           });
@@ -499,7 +583,8 @@ class PlayerStore {
     }
   }
 
-  async playTrack(track: Track, newQueue: Track[] = []) {
+  async playTrack(track: Track, newQueue: Track[] = [], autoPlay: boolean = true, startTime: number = 0, isSyncTriggered: boolean = false) {
+    if (this.disableQueueControls && !isSyncTriggered) return;
     this.init();
 
     // Instantly stop and reset the previous song
@@ -536,17 +621,20 @@ class PlayerStore {
     this.currentTrack = track;
     this.isPlaying = false;
     this.isBuffering = true;
-    this.currentTime = 0;
+    this.currentTime = startTime;
     this.duration = track.duration || 0;
     this.likeStatus = this.likedSongIds.includes(track.videoId) ? 'Like' : 'Indifferent';
     this.saveState();
     this.#updateMediaSessionMetadata();
     this.#updateMediaSessionPlaybackState();
+    this.updatePresence();
+    this.syncStateToPeers();
 
-    await this.#startStreamPlayback(track, 0, signal);
+    await this.#startStreamPlayback(track, startTime, signal, autoPlay);
   }
 
   async playWithUpNext(track: Track) {
+    if (this.disableQueueControls) return;
     this.init();
 
     // Play track immediately
@@ -587,7 +675,8 @@ class PlayerStore {
     await this.#startStreamPlayback(track, this.currentTime, signal);
   }
 
-  togglePlay() {
+  togglePlay(isSyncTriggered: boolean = false) {
+    if (this.disableQueueControls && !isSyncTriggered) return;
     this.init();
     if (!this.audio || !this.currentTrack) return;
 
@@ -597,6 +686,8 @@ class PlayerStore {
       this.isBuffering = false;
       this.saveState();
       this.#updateMediaSessionPlaybackState();
+      this.updatePresence();
+      this.syncStateToPeers();
     } else {
       if (!this.audio.src || this.audio.src === "") {
         this.resumeTrackStream();
@@ -605,6 +696,8 @@ class PlayerStore {
           this.isPlaying = true;
           this.saveState();
           this.#updateMediaSessionPlaybackState();
+          this.updatePresence();
+          this.syncStateToPeers();
         }).catch((e) => {
           console.warn("Failed to resume playback, attempting stream recovery...", e);
           this.resumeTrackStream();
@@ -613,13 +706,16 @@ class PlayerStore {
     }
   }
 
-  seek(time: number) {
+  seek(time: number, isSyncTriggered: boolean = false) {
+    if (this.disableQueueControls && !isSyncTriggered) return;
     if (this.audio) {
       this.isBuffering = true;
       this.audio.currentTime = time;
       this.currentTime = time;
       this.saveState();
       this.#updateMediaSessionPositionState();
+      this.updatePresence();
+      this.syncStateToPeers();
     }
   }
 
@@ -636,6 +732,7 @@ class PlayerStore {
   }
 
   async next() {
+    if (this.disableQueueControls) return;
     if (this.queue.length === 0) return;
     let nextIdx = this.currentIndex + 1;
     if (nextIdx >= this.queue.length) {
@@ -676,6 +773,7 @@ class PlayerStore {
         this.isPlaying = false;
         this.isBuffering = false;
         this.#updateMediaSessionPlaybackState();
+        this.updatePresence();
         return;
       } else {
         nextIdx = 0; // Loop queue
@@ -685,6 +783,7 @@ class PlayerStore {
   }
 
   prev() {
+    if (this.disableQueueControls) return;
     if (this.queue.length === 0) return;
     let prevIdx = this.currentIndex - 1;
     if (prevIdx < 0) {

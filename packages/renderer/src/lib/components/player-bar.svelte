@@ -218,7 +218,7 @@
         </Button>
         <Slider
           class="w-0 2xl:w-30 2xl:opacity-100 opacity-0 group-hover/volume:w-30 group-hover:opacity-100 transition-all duration-300 overflow-hidden
-          **:data-slider-thumb:w-0 **:data-slider-thumb:opacity-0  **:data-[slot='slider-track']:bg-foreground/10"
+          **:data-slider-thumb:w-0 **:data-slider-thumb:opacity-0  **:data-[slot='slider-track']:bg-foreground/10 **:data-[slot='slider-range']:bg-foreground"
           type="single"
           orientation="horizontal"
           value={player.isMuted ? 0 : player.volume}

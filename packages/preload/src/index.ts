@@ -95,4 +95,33 @@ function onUpdateDownloaded(callback: (info: any) => void): () => void {
   };
 }
 
-export { sha256sum, versions, platform, send, ytmusic, checkForUpdates, getAppVersion, restartAndInstall, onUpdateDownloaded };
+function updateDiscordPresence(presence: any): Promise<void> {
+  return ipcRenderer.invoke('update-discord-presence', presence);
+}
+
+function getPendingDeepLink(): Promise<string | null> {
+  return ipcRenderer.invoke('get-pending-deep-link');
+}
+
+function onDeepLink(callback: (url: string) => void): () => void {
+  const listener = (_event: any, url: string) => callback(url);
+  ipcRenderer.on('deep-link', listener);
+  return () => {
+    ipcRenderer.off('deep-link', listener);
+  };
+}
+
+export {
+  sha256sum,
+  versions,
+  platform,
+  send,
+  ytmusic,
+  checkForUpdates,
+  getAppVersion,
+  restartAndInstall,
+  onUpdateDownloaded,
+  updateDiscordPresence,
+  getPendingDeepLink,
+  onDeepLink,
+};

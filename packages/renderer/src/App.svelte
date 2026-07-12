@@ -28,6 +28,8 @@
     CaseSensitiveIcon,
     GaugeIcon,
     PlusIcon,
+    Gamepad2Icon,
+    RadioIcon,
   } from "@lucide/svelte/icons";
   import {
     ytmusic,
@@ -54,6 +56,7 @@
   import History from "$lib/views/History.svelte";
   import { player } from "$lib/stores/player.svelte";
   import { navigation } from "$lib/stores/navigation.svelte";
+  import { syncStore } from "$lib/stores/sync.svelte";
   import SongTable from "$lib/components/song-table.svelte";
   import { ScrollArea } from "$lib/components/ui/scroll-area";
   import SearchInput from "$lib/components/search-input.svelte";
@@ -62,6 +65,7 @@
   import type { PlaylistDetailed, AccountInfo } from "@app/api/src";
   import Image from "$lib/components/ui/image.svelte";
   import Lyrics from "$lib/components/lyrics.svelte";
+  import ListenTogether from "$lib/components/listen-together.svelte";
   import ExtendedPlayer from "$lib/components/extended-player.svelte";
   import * as Select from "$lib/components/ui/select";
   import CreatePlaylistDialog from "$lib/components/create-playlist-dialog.svelte";
@@ -101,6 +105,7 @@
 
   onMount(() => {
     player.init();
+    syncStore.init();
 
     const unsubscribeUpdate = onUpdateDownloaded((info) => {
       updateStatus = "downloaded";
@@ -115,7 +120,6 @@
     const refreshPlaylists = async () => {
       try {
         sidebarPlaylists = await ytmusic.getLibraryPlaylists(100);
-        console.log(sidebarPlaylists);
       } catch (e) {
         console.warn("Failed to refresh sidebar playlists:", e);
       }
@@ -133,6 +137,10 @@
         if (info && info.accountName) {
           accountInfo = info;
           player.isAuthed = true;
+          syncStore.setLocalProfile({
+            name: info.accountName,
+            photoUrl: info.accountPhotoUrl,
+          });
           await refreshPlaylists();
         } else {
           player.isAuthed = false;
@@ -443,6 +451,20 @@
                     </DropdownMenu.SubContent>
                   </DropdownMenu.Sub>
 
+                  <!-- Discord Presence -->
+                  <DropdownMenu.Item
+                    onclick={() => player.toggleDiscordPresence()}
+                    class="flex items-center justify-between rounded-2xl px-3 py-2 text-sm font-medium hover:bg-accent cursor-pointer"
+                  >
+                    <div class="flex items-center gap-2">
+                      <Gamepad2Icon class="size-4" />
+                      <span>Discord Presence</span>
+                    </div>
+                    {#if player.discordPresenceEnabled}
+                      <CheckIcon class="size-4 text-primary" />
+                    {/if}
+                  </DropdownMenu.Item>
+
                   <DropdownMenu.Separator
                     class="my-1 border-t border-border/50"
                   />
@@ -499,10 +521,52 @@
             </div>
             <div>
               <ButtonGroup.Root
-                class="rounded-full bg-background/50 backdrop-blur-sm  border border-border h-10 items-center flex gap-1 p-1 shadow-glass hover:shadow-glass-hover transition-shadow overflow-hidden"
+                class="rounded-full bg-background/50 backdrop-blur-sm  border border-border h-10 items-center flex px-2 shadow-glass hover:shadow-glass-hover transition-shadow overflow-hidden"
                 style="app-region: no-drag;"
                 data-glow
               >
+                <div
+                  class="absolute w-[48px] h-full left-0 p-1 pointer-events-none transition-all duration-200 ease-out"
+                  style="
+                    opacity: {player.activeSidebar === 'none' ? '0' : '1'};
+                    transform: translateX({player.activeSidebar === 'none'
+                    ? '0px'
+                    : player.isAuthed
+                      ? player.activeSidebar === 'listen-together'
+                        ? '0px'
+                        : player.activeSidebar === 'lyrics'
+                          ? '32px'
+                          : '64px'
+                      : player.activeSidebar === 'lyrics'
+                        ? '0px'
+                        : '32px'});
+                  "
+                >
+                  <div class="size-full bg-foreground/10 rounded-full"></div>
+                </div>
+                {#if player.isAuthed}
+                  <Button
+                    variant="link"
+                    size="icon-sm"
+                    active-scale="child"
+                    onclick={() =>
+                      (player.activeSidebar =
+                        player.activeSidebar === "listen-together"
+                          ? "none"
+                          : "listen-together")}
+                    class="relative {player.activeSidebar === 'listen-together'
+                      ? 'text-primary'
+                      : ''}"
+                    title="Listen Together"
+                  >
+                    {#if syncStore.status === "connected"}
+                      <div
+                        class="size-2 bg-emerald-500 rounded-full absolute top-1.5 right-1 z-10"
+                      ></div>
+                    {/if}
+                    <RadioIcon class="size-5" />
+                  </Button>
+                {/if}
                 <Button
                   variant="link"
                   size="icon-sm"
@@ -514,7 +578,7 @@
                     ? "text-primary"
                     : ""}><MicVocalIcon /></Button
                 >
-                <div class="w-[2px] h-4 my-auto bg-border"></div>
+                <!-- <div class="w-[2px] h-4 my-auto bg-border"></div> -->
                 <Button
                   variant="link"
                   size="icon-sm"
@@ -539,7 +603,7 @@
         <Resizable.Pane id="right" minSize={20} defaultSize={20} maxSize={30}>
           <div class="size-full overflow-hidden relative">
             {#if activeSidebar === "queue"}
-              <h2 class="text-lg font-bold absolute pt-4 px-2 z-10">Queue</h2>
+              <h2 class="text-lg font-bold absolute pt-5 px-2 z-10">Queue</h2>
               <div
                 class="w-full h-12 absolute top-0 bg-linear-to-b from-background to-transparent z-5 pointer-events-none"
               ></div>
@@ -590,6 +654,8 @@
               </div>
 
               <Lyrics />
+            {:else if activeSidebar === "listen-together"}
+              <ListenTogether />
             {/if}
           </div>
         </Resizable.Pane>
@@ -686,5 +752,6 @@
       </div>
     </Dialog.Content>
   </Dialog.Root>
+
   <Glow />
 </section>

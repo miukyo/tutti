@@ -15,7 +15,7 @@
         default:
           "bg-primary text-primary-foreground shadow-glass hover:shadow-glass-hover hover:bg-primary/90",
         outline:
-          "border-border hover:bg-foreground/10 hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground shadow-glass hover:shadow-glass-hover",
+          "border-border hover:bg-foreground/10 hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground",
         "outline-blur":
           "text-foreground border border-border bg-background/50 backdrop-blur-sm shadow-glass hover:shadow-glass-hover",
         secondary:
