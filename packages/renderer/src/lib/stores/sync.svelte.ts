@@ -18,6 +18,9 @@ export class SyncStore {
   error = $state<string | null>(null);
   participants = $state<Participant[]>([]);
   localProfile = $state<{ name: string; photoUrl?: string } | null>(null);
+  clockOffset = $state(0);
+  pingInterval: any = null;
+  syncInterval: any = null;
 
   init() {
     if (typeof window !== "undefined") {
@@ -58,7 +61,7 @@ export class SyncStore {
     ];
 
     const turnUsername = "g0e671ec22ad3b495ab7d1f2d872233b30a64ffdaf45f0f580ffc3bbaabe51a7";
-    const turnCredential = "fcd9d67134d321c4220490a7fc5b991f0a14d1d8ceedc01412f89ac4f42d1b2e";
+    const turnCredential = "  ";
 
     if (turnUsername && turnCredential) {
       iceServers.push({
@@ -121,6 +124,22 @@ export class SyncStore {
         role: 'host'
       }];
       player.updatePresence();
+
+      // Start periodic sync broadcast for Host
+      if (this.syncInterval) clearInterval(this.syncInterval);
+      this.syncInterval = setInterval(() => {
+        if (this.role === 'host' && this.status === 'connected' && player.isPlaying) {
+          this.broadcast({
+            type: 'sync',
+            track: player.currentTrack,
+            isPlaying: player.isPlaying,
+            currentTime: player.currentTime,
+            queue: player.queue,
+            currentIndex: player.currentIndex,
+            sentAt: Date.now()
+          });
+        }
+      }, 10000);
     });
 
     peer.on('connection', (conn) => {
@@ -130,6 +149,14 @@ export class SyncStore {
       });
 
       conn.on('data', (data: any) => {
+        if (data.type === 'ping') {
+          conn.send({
+            type: 'pong',
+            t0: data.t0,
+            t1: Date.now()
+          });
+          return;
+        }
         if (data.type === 'hello') {
           const newGuest: Participant = {
             peerId: conn.peer,
@@ -192,6 +219,12 @@ export class SyncStore {
         this.status = 'connected';
         this.connections = [conn];
         player.disableQueueControls = true;
+        // Start ping / clock sync mechanism
+        this.clockOffset = 0;
+        this.sendPing();
+        if (this.pingInterval) clearInterval(this.pingInterval);
+        this.pingInterval = setInterval(() => this.sendPing(), 15000);
+
         conn.send({
           type: 'hello',
           name: this.localProfile?.name || 'Guest',
@@ -243,6 +276,16 @@ export class SyncStore {
     this.participants = [];
     player.disableQueueControls = false;
 
+    if (this.pingInterval) {
+      clearInterval(this.pingInterval);
+      this.pingInterval = null;
+    }
+    if (this.syncInterval) {
+      clearInterval(this.syncInterval);
+      this.syncInterval = null;
+    }
+    this.clockOffset = 0;
+
     for (const conn of this.connections) {
       try {
         conn.close();
@@ -258,6 +301,17 @@ export class SyncStore {
     }
 
     player.updatePresence();
+  }
+
+  sendPing() {
+    if (this.role !== 'guest') return;
+    const conn = this.connections[0];
+    if (conn && conn.open) {
+      conn.send({
+        type: 'ping',
+        t0: Date.now()
+      });
+    }
   }
 
   broadcast(message: any) {
@@ -283,6 +337,19 @@ export class SyncStore {
   }
 
   private handleSyncMessage(data: any) {
+    if (data.type === 'pong') {
+      const t2 = Date.now();
+      const rtt = t2 - data.t0;
+      const latency = rtt / 2;
+      const offset = data.t1 - (data.t0 + latency);
+      if (this.clockOffset === 0) {
+        this.clockOffset = offset;
+      } else {
+        this.clockOffset = this.clockOffset * 0.7 + offset * 0.3;
+      }
+      return;
+    }
+
     if (data.type === 'participants-list') {
       this.participants = data.participants;
       return;
@@ -299,8 +366,9 @@ export class SyncStore {
         }
       }
 
-      // Adjust for network delay
-      const delay = (Date.now() - sentAt) / 1000;
+      // Adjust for network delay using NTP clock sync offset
+      const delayMs = Math.max(0, Date.now() - (sentAt - this.clockOffset));
+      const delay = delayMs / 1000;
       const targetTime = currentTime + delay;
 
       // 1. Sync track

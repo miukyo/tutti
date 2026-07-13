@@ -22,10 +22,11 @@
       groups[key].push({
         videoId: item.videoId,
         name: item.title,
-        artist: item.artists.map((a: any) => a.name).join(", ") || "Unknown Artist",
+        artist:
+          item.artists.map((a: any) => a.name).join(", ") || "Unknown Artist",
         artistId: item.artists[0]?.artistId || null,
         thumbnail: item.thumbnails?.[0]?.url || "",
-        duration: null
+        duration: null,
       });
     }
     return Object.entries(groups).map(([title, songs]) => ({ title, songs }));
@@ -72,7 +73,7 @@
 </script>
 
 <ScrollArea class="w-full h-full">
-  <div class="h-max mb-25 px-6 pt-14">
+  <div class="h-max mb-25 px-6 pt-18">
     {#if loading && isAuthed === null}
       <div class="flex flex-col items-center justify-center h-96">
         <p class="text-muted-foreground animate-pulse">
@@ -90,11 +91,9 @@
           <HistoryIcon class="size-16" />
         </div>
         <div class="space-y-2">
-          <h1 class="text-3xl font-extrabold tracking-tight">
-            Listening History
-          </h1>
+          <h1 class="text-3xl font-extrabold tracking-tight">History</h1>
           <p class="text-muted-foreground text-sm leading-relaxed">
-            Log in to see your recently played songs from YouTube Music.
+            Log in to see your recently played songs.
           </p>
         </div>
         <Button
@@ -108,10 +107,10 @@
     {:else}
       <!-- Authenticated view -->
       <div class="flex flex-col gap-4 mb-8">
-        <h1 class="text-3xl font-extrabold tracking-tight">History</h1>
-        <p class="text-sm text-muted-foreground">
-          Your recently played songs on YouTube Music.
-        </p>
+        <h1 class="text-3xl font-extrabold tracking-tight leading-0">
+          History
+        </h1>
+        <p class="text-sm text-muted-foreground">Your recently played songs.</p>
       </div>
 
       {#if loading}
@@ -136,8 +135,16 @@
         <div class="flex flex-col gap-8 w-full">
           {#each groupedHistory as group}
             <div class="flex flex-col gap-3">
-              <h2 class="text-lg font-bold text-foreground border-b border-border/50 pb-2">{group.title}</h2>
-              <SongTable songs={group.songs} showHeader={false} />
+              <h2
+                class="text-lg font-bold text-foreground border-b border-border/50 pb-2"
+              >
+                {group.title}
+              </h2>
+              <SongTable
+                songs={group.songs}
+                showHeader={false}
+                playWithUpNext={true}
+              />
             </div>
           {/each}
         </div>

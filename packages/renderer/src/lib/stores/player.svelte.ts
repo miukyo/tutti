@@ -508,42 +508,40 @@ class PlayerStore {
 
     this.audio.src = bestStream.url;
 
-    if (startTime > 0 || !autoPlay) {
-      await new Promise<void>((resolve, reject) => {
-        let cleanedUp = false;
-        const cleanup = () => {
-          if (cleanedUp) return;
-          cleanedUp = true;
-          this.audio?.removeEventListener("loadedmetadata", onLoadedMetadata);
-          this.audio?.removeEventListener("error", onError);
-        };
+    await new Promise<void>((resolve, reject) => {
+      let cleanedUp = false;
+      const cleanup = () => {
+        if (cleanedUp) return;
+        cleanedUp = true;
+        this.audio?.removeEventListener("loadedmetadata", onLoadedMetadata);
+        this.audio?.removeEventListener("error", onError);
+      };
 
-        const onLoadedMetadata = () => {
-          cleanup();
-          if (this.audio && !signal.aborted && this.currentTrack?.videoId === track.videoId) {
+      const onLoadedMetadata = () => {
+        cleanup();
+        if (this.audio && !signal.aborted && this.currentTrack?.videoId === track.videoId) {
+          if (startTime > 0) {
             this.audio.currentTime = startTime;
-            if (autoPlay) {
-              this.audio.play().then(resolve).catch(reject);
-            } else {
-              this.audio.pause();
-              resolve();
-            }
-          } else {
-            reject(new Error("Track changed or audio is null"));
           }
-        };
+          if (autoPlay) {
+            this.audio.play().then(resolve).catch(reject);
+          } else {
+            this.audio.pause();
+            resolve();
+          }
+        } else {
+          reject(new Error("Track changed or audio is null"));
+        }
+      };
 
-        const onError = () => {
-          cleanup();
-          reject(this.audio?.error || new Error("Audio loading failed"));
-        };
+      const onError = () => {
+        cleanup();
+        reject(this.audio?.error || new Error("Audio loading failed"));
+      };
 
-        this.audio?.addEventListener("loadedmetadata", onLoadedMetadata);
-        this.audio?.addEventListener("error", onError);
-      });
-    } else {
-      await this.audio.play();
-    }
+      this.audio?.addEventListener("loadedmetadata", onLoadedMetadata);
+      this.audio?.addEventListener("error", onError);
+    });
 
     this.isPlaying = autoPlay;
     this.saveState();
@@ -619,7 +617,7 @@ class PlayerStore {
     }
 
     this.currentTrack = track;
-    this.isPlaying = false;
+    this.isPlaying = autoPlay;
     this.isBuffering = true;
     this.currentTime = startTime;
     this.duration = track.duration || 0;
