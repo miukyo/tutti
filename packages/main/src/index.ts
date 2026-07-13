@@ -23,7 +23,7 @@ export async function initApp(initConfig: AppInitConfig) {
   ipcMain.handle('get-app-version', () => app.getVersion());
 
   const modules = [
-    disallowMultipleAppInstance(),
+    // disallowMultipleAppInstance(),
     terminateAppOnLastWindowClose(),
     hardwareAccelerationMode({ enable: true }),
     autoUpdater(),

@@ -64,9 +64,6 @@ export class SyncStore {
     const config = {
       config: {
         iceServers: [
-          { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:stun1.l.google.com:19302' },
-          { urls: 'stun:stun2.l.google.com:19302' },
           { urls: ["stun:stun.cloudflare.com:3478", "stun:stun.cloudflare.com:53"] },
           {
             urls: [
@@ -79,6 +76,17 @@ export class SyncStore {
             ],
             username: import.meta.env.VITE_TURN_USERNAME || "",
             credential: import.meta.env.VITE_TURN_CREDENTIAL || ""
+          }, {
+            urls: [
+              'turn:openrelay.metered.ca:80',
+              'turn:openrelay.metered.ca:443',
+              'turn:openrelay.metered.ca:5349?transport=udp',
+              'turn:openrelay.metered.ca:5349?transport=tcp',
+              'turns:openrelay.metered.ca:443?transport=tcp',
+              'turns:openrelay.metered.ca:5349?transport=tcp'
+            ],
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
           }
         ]
       },
@@ -145,20 +153,19 @@ export class SyncStore {
     });
   }
 
-  async joinRoom(code: string) {
+  async joinRoom(code: string, retryCount = 0) {
     const cleanCode = code.trim().toUpperCase();
     if (!cleanCode) return;
 
-    this.leaveRoom();
-    this.status = 'connecting';
-    this.error = null;
+    if (retryCount === 0) {
+      this.leaveRoom();
+      this.status = 'connecting';
+      this.error = null;
+    }
 
     const config = {
       config: {
         iceServers: [
-          { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:stun1.l.google.com:19302' },
-          { urls: 'stun:stun2.l.google.com:19302' },
           { urls: ["stun:stun.cloudflare.com:3478", "stun:stun.cloudflare.com:53"] },
           {
             urls: [
@@ -171,6 +178,18 @@ export class SyncStore {
             ],
             username: import.meta.env.VITE_TURN_USERNAME || "",
             credential: import.meta.env.VITE_TURN_CREDENTIAL || ""
+          },
+          {
+            urls: [
+              'turn:openrelay.metered.ca:80',
+              'turn:openrelay.metered.ca:443',
+              'turn:openrelay.metered.ca:5349?transport=udp',
+              'turn:openrelay.metered.ca:5349?transport=tcp',
+              'turns:openrelay.metered.ca:443?transport=tcp',
+              'turns:openrelay.metered.ca:5349?transport=tcp'
+            ],
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
           }
         ]
       },
@@ -216,6 +235,19 @@ export class SyncStore {
 
     peer.on('error', (err) => {
       console.error("Guest PeerJS error:", err);
+
+      if (err.type === 'peer-unavailable' && retryCount < 10) {
+        console.log(`Host peer not found yet. Retrying connection (attempt ${retryCount + 1}/10) in 2 seconds...`);
+        this.status = 'connecting';
+
+        try { peer.destroy(); } catch { }
+
+        setTimeout(() => {
+          this.joinRoom(code, retryCount + 1);
+        }, 2000);
+        return;
+      }
+
       this.error = `Failed to connect: ${err.type || 'unknown error'}`;
       this.leaveRoom();
     });

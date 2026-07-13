@@ -243,7 +243,7 @@ class PlayerStore {
 
   recoverStuckAudio() {
     console.log("Audio playback stuck or error. Retrying stream recovery...");
-    this.resumeTrackStream();
+    this.resumeTrackStream(this.isPlaying);
   }
 
   loadState() {
@@ -661,7 +661,7 @@ class PlayerStore {
     }
   }
 
-  async resumeTrackStream() {
+  async resumeTrackStream(autoPlay: boolean = this.isPlaying) {
     if (!this.currentTrack || !this.audio) return;
     this.isBuffering = true;
     const track = this.currentTrack;
@@ -672,7 +672,7 @@ class PlayerStore {
     this.currentAbortController = new AbortController();
     const signal = this.currentAbortController.signal;
 
-    await this.#startStreamPlayback(track, this.currentTime, signal);
+    await this.#startStreamPlayback(track, this.currentTime, signal, autoPlay);
   }
 
   togglePlay(isSyncTriggered: boolean = false) {
@@ -690,7 +690,8 @@ class PlayerStore {
       this.syncStateToPeers();
     } else {
       if (!this.audio.src || this.audio.src === "") {
-        this.resumeTrackStream();
+        this.isPlaying = true;
+        this.resumeTrackStream(true);
       } else {
         this.audio.play().then(() => {
           this.isPlaying = true;
@@ -700,7 +701,8 @@ class PlayerStore {
           this.syncStateToPeers();
         }).catch((e) => {
           console.warn("Failed to resume playback, attempting stream recovery...", e);
-          this.resumeTrackStream();
+          this.isPlaying = true;
+          this.resumeTrackStream(true);
         });
       }
     }
