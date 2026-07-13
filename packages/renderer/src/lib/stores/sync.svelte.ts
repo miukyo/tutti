@@ -52,6 +52,50 @@ export class SyncStore {
     }
   }
 
+  private getPeerConfig() {
+    const iceServers: any[] = [
+      { urls: ["stun:stun.cloudflare.com:3478", "stun:stun.cloudflare.com:53"] }
+    ];
+
+    const turnUsername = "g0e671ec22ad3b495ab7d1f2d872233b30a64ffdaf45f0f580ffc3bbaabe51a7";
+    const turnCredential = "fcd9d67134d321c4220490a7fc5b991f0a14d1d8ceedc01412f89ac4f42d1b2e";
+
+    if (turnUsername && turnCredential) {
+      iceServers.push({
+        urls: [
+          "turn:turn.cloudflare.com:3478?transport=udp",
+          "turn:turn.cloudflare.com:3478?transport=tcp",
+          "turns:turn.cloudflare.com:5349?transport=tcp",
+          "turn:turn.cloudflare.com:53?transport=udp",
+          "turn:turn.cloudflare.com:80?transport=tcp",
+          "turns:turn.cloudflare.com:443?transport=tcp"
+        ],
+        username: turnUsername,
+        credential: turnCredential
+      });
+    }
+
+    iceServers.push({
+      urls: [
+        'turn:openrelay.metered.ca:80',
+        'turn:openrelay.metered.ca:443',
+        'turn:openrelay.metered.ca:5349?transport=udp',
+        'turn:openrelay.metered.ca:5349?transport=tcp',
+        'turns:openrelay.metered.ca:443?transport=tcp',
+        'turns:openrelay.metered.ca:5349?transport=tcp'
+      ],
+      username: 'openrelayproject',
+      credential: 'openrelayproject'
+    });
+
+    return {
+      config: {
+        iceServers
+      },
+      debug: 1
+    };
+  }
+
   async createRoom() {
     this.leaveRoom();
     this.status = 'connecting';
@@ -61,37 +105,7 @@ export class SyncStore {
     const code = Math.random().toString(36).substring(2, 8).toUpperCase();
     const peerId = `tutti-${code}`;
 
-    const config = {
-      config: {
-        iceServers: [
-          { urls: ["stun:stun.cloudflare.com:3478", "stun:stun.cloudflare.com:53"] },
-          {
-            urls: [
-              "turn:turn.cloudflare.com:3478?transport=udp",
-              "turn:turn.cloudflare.com:3478?transport=tcp",
-              "turns:turn.cloudflare.com:5349?transport=tcp",
-              "turn:turn.cloudflare.com:53?transport=udp",
-              "turn:turn.cloudflare.com:80?transport=tcp",
-              "turns:turn.cloudflare.com:443?transport=tcp"
-            ],
-            username: import.meta.env.VITE_TURN_USERNAME || "",
-            credential: import.meta.env.VITE_TURN_CREDENTIAL || ""
-          }, {
-            urls: [
-              'turn:openrelay.metered.ca:80',
-              'turn:openrelay.metered.ca:443',
-              'turn:openrelay.metered.ca:5349?transport=udp',
-              'turn:openrelay.metered.ca:5349?transport=tcp',
-              'turns:openrelay.metered.ca:443?transport=tcp',
-              'turns:openrelay.metered.ca:5349?transport=tcp'
-            ],
-            username: 'openrelayproject',
-            credential: 'openrelayproject'
-          }
-        ]
-      },
-      debug: 1
-    };
+    const config = this.getPeerConfig();
 
     const peer = new Peer(peerId, config);
 
@@ -163,38 +177,7 @@ export class SyncStore {
       this.error = null;
     }
 
-    const config = {
-      config: {
-        iceServers: [
-          { urls: ["stun:stun.cloudflare.com:3478", "stun:stun.cloudflare.com:53"] },
-          {
-            urls: [
-              "turn:turn.cloudflare.com:3478?transport=udp",
-              "turn:turn.cloudflare.com:3478?transport=tcp",
-              "turns:turn.cloudflare.com:5349?transport=tcp",
-              "turn:turn.cloudflare.com:53?transport=udp",
-              "turn:turn.cloudflare.com:80?transport=tcp",
-              "turns:turn.cloudflare.com:443?transport=tcp"
-            ],
-            username: import.meta.env.VITE_TURN_USERNAME || "",
-            credential: import.meta.env.VITE_TURN_CREDENTIAL || ""
-          },
-          {
-            urls: [
-              'turn:openrelay.metered.ca:80',
-              'turn:openrelay.metered.ca:443',
-              'turn:openrelay.metered.ca:5349?transport=udp',
-              'turn:openrelay.metered.ca:5349?transport=tcp',
-              'turns:openrelay.metered.ca:443?transport=tcp',
-              'turns:openrelay.metered.ca:5349?transport=tcp'
-            ],
-            username: 'openrelayproject',
-            credential: 'openrelayproject'
-          }
-        ]
-      },
-      debug: 1
-    };
+    const config = this.getPeerConfig();
 
     const peer = new Peer(config);
 
