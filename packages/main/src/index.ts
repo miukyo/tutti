@@ -41,7 +41,7 @@ export async function initApp(initConfig: AppInitConfig) {
     // ponytail: simplified empty Set instantiation
     allowExternalUrls(new Set()),
     garbageCollectorModule(),
-    createWindowManagerModule({ initConfig, openDevTools: import.meta.env.DEV }),
+    createWindowManagerModule({ initConfig, openDevTools: true }),
   ];
 
   for (const module of modules) {
