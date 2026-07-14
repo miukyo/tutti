@@ -24,8 +24,7 @@
       .map((item) => ({
         videoId: item.videoId,
         name: item.name,
-        artist: item.artist?.name || "Unknown Artist",
-        artistId: item.artist?.artistId,
+        artists: item.artists,
         thumbnail: item.thumbnails?.at(0)?.url || "",
         duration: item.duration,
       })),
@@ -35,8 +34,7 @@
     const track: Track = {
       videoId: item.videoId,
       name: item.name,
-      artist: item.artist?.name || "Unknown Artist",
-      artistId: item.artist?.artistId,
+      artists: item.artists,
       thumbnail: item.thumbnails?.at(0)?.url || "",
       duration: item.duration,
     };
@@ -96,7 +94,7 @@
                   />
                 </div>
                 <div class="min-w-0">
-                  <p class="font-medium text-sm group-hover:underline truncate">
+                  <p class="font-medium text-sm truncate">
                     {item.name}
                   </p>
                   <p class="text-xs text-muted-foreground truncate">
@@ -104,29 +102,39 @@
                       Artist
                     {:else if item.type === "ALBUM"}
                       Album •
-                      {#if item.artist?.artistId}
-                        <a
-                          href="#/artist/{item.artist.artistId}"
-                          use:link
-                          class="hover:underline">{item.artist.name}</a
-                        >
-                      {:else}
-                        {item.artist?.name || "Unknown Artist"}
-                      {/if}
+                      {#each item.artists as artist, idx}
+                        {#if idx > 0}
+                          , 
+                        {/if}
+                        {#if artist.artistId}
+                          <a
+                            href="#/artist/{artist.artistId}"
+                            use:link
+                            class="hover:underline">{artist.name}</a
+                          >
+                        {:else}
+                          {artist.name}
+                        {/if}
+                      {/each}
                       {#if item.year}
                         • {item.year}
                       {/if}
                     {:else if item.type === "PLAYLIST"}
                       Playlist •
-                      {#if item.artist?.artistId}
-                        <a
-                          href="#/artist/{item.artist.artistId}"
-                          use:link
-                          class="hover:underline">{item.artist.name}</a
-                        >
-                      {:else}
-                        {item.artist?.name || "Unknown Artist"}
-                      {/if}
+                      {#each item.artists as artist, idx}
+                        {#if idx > 0}
+                          , 
+                        {/if}
+                        {#if artist.artistId}
+                          <a
+                            href="#/artist/{artist.artistId}"
+                            use:link
+                            class="hover:underline">{artist.name}</a
+                          >
+                        {:else}
+                          {artist.name}
+                        {/if}
+                      {/each}
                     {:else}
                       {item.type.charAt(0).toUpperCase() +
                         item.type.slice(1).toLowerCase()}
@@ -171,15 +179,20 @@
                   </p>
                   <p class="text-xs text-muted-foreground truncate">
                     {item.type === "SONG" ? "Song" : "Video"} •
-                    {#if item.artist?.artistId}
-                      <a
-                        href="#/artist/{item.artist.artistId}"
-                        use:link
-                        class="hover:underline">{item.artist.name}</a
-                      >
-                    {:else}
-                      {item.artist?.name || "Unknown Artist"}
-                    {/if}
+                    {#each item.artists as artist, idx}
+                      {#if idx > 0}
+                        , 
+                      {/if}
+                      {#if artist.artistId}
+                        <a
+                          href="#/artist/{artist.artistId}"
+                          use:link
+                          class="hover:underline">{artist.name}</a
+                        >
+                      {:else}
+                        {artist.name}
+                      {/if}
+                    {/each}
                   </p>
                 </div>
               </div>

@@ -785,8 +785,8 @@ export class YTMusic {
       const titleNode = traverse(videoRenderer, 'title', 'runs');
       const titleText = Array.isArray(titleNode) && titleNode.length > 0 ? traverseString(titleNode[0], 'text') : 'Unknown';
 
-      const bylineNode = traverse(videoRenderer, 'shortBylineText', 'runs');
-      const bylineText = Array.isArray(bylineNode) && bylineNode.length > 0 ? traverseString(bylineNode[0], 'text') : 'Unknown';
+      const bylineNode = traverse(videoRenderer, 'longBylineText', 'runs');
+      const artists = Array.isArray(bylineNode) ? parser.parseArtists(bylineNode) : [];
 
       const lengthNode = traverse(videoRenderer, 'lengthText', 'runs');
       const lengthText = Array.isArray(lengthNode) && lengthNode.length > 0 ? traverseString(lengthNode[0], 'text') : 'Unknown';
@@ -798,7 +798,7 @@ export class YTMusic {
         type: 'SONG',
         videoId: vId,
         title: titleText,
-        artists: bylineText,
+        artists: artists,
         duration: lengthText,
         thumbnail: thUrl
       });
@@ -832,7 +832,7 @@ export class YTMusic {
       try {
         const video = await this.getVideo(videoId);
         songTitle = songTitle || video.name;
-        songArtist = songArtist || (video.artist?.name || '');
+        songArtist = songArtist || (video.artists?.[0]?.name || '');
         songDuration = songDuration || video.duration;
       } catch (e) {
         console.warn("Failed to fetch video metadata for lyrics:", e);
@@ -1662,12 +1662,14 @@ export class YTMusic {
         for (const col of traverseList(item, 'flexColumns')) {
           for (const run of traverseList(col, 'runs')) {
             const artistId = traverseString(run, 'browseId');
-            const artistName = traverseString(run, 'text');
-            if (artistId || artistName) {
-              artistRuns.push(run);
-            }
+            const artistName = traverseString(run, 'text')?.trim();
+            if (!artistName || artistName === '&' || artistName === ',' || artistName === 'and' || artistName === 'feat.' || artistName === 'ft.' || artistName === "•" || artistName.toLowerCase().includes("views")) continue;
+            if (artistId && !artistId.startsWith('UC')) continue;
+            if (artistName === historyItem.title) continue;
+            artistRuns.push(run);
           }
         }
+
 
         for (const run of artistRuns) {
           historyItem.artists.push({

@@ -37,8 +37,7 @@
     return album.songs.map((s) => ({
       videoId: s.videoId,
       name: s.name,
-      artist: s.artist?.name || album?.artist?.name || "Unknown Artist",
-      artistId: s.artist?.artistId || album?.artist?.artistId,
+      artists: s.artists,
       thumbnail:
         album?.thumbnails?.at(0)?.url || s.thumbnails?.at(0)?.url || "",
       duration: s.duration,
@@ -83,13 +82,22 @@
             {album.name}
           </h1>
           <div class="flex items-center gap-2 text-sm text-muted-foreground">
-            {#if album.artist?.name}
-              <a
-                href="#/artist/{album.artist.artistId}"
-                class="hover:underline font-medium text-foreground"
-              >
-                {album.artist.name}
-              </a>
+            {#if album.artists && album.artists.length > 0}
+              {#each album.artists as artist, idx}
+                {#if idx > 0}
+                  <span>&bull;</span>
+                {/if}
+                {#if artist.artistId}
+                  <a
+                    href="#/artist/{artist.artistId}"
+                    class="hover:underline font-medium text-foreground"
+                  >
+                    {artist.name}
+                  </a>
+                {:else}
+                  <span class="font-medium text-foreground">{artist.name}</span>
+                {/if}
+              {/each}
               <span>•</span>
             {/if}
             {#if album.year}

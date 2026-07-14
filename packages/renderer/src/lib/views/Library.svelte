@@ -71,8 +71,7 @@
         items = fetched.map((s) => ({
           videoId: s.videoId,
           name: s.name,
-          artist: s.artist?.name || "Unknown Artist",
-          artistId: s.artist?.artistId,
+          artists: s.artists,
           thumbnail: s.thumbnails?.at(0)?.url || "",
           duration: s.duration,
         }));
@@ -128,8 +127,7 @@
         tracks = playlistVideos.map((s: any) => ({
           videoId: s.videoId,
           name: s.name,
-          artist: s.artist?.name || "Unknown Artist",
-          artistId: s.artist?.artistId,
+          artists: s.artists,
           thumbnail: s.thumbnails?.at(0)?.url || "",
           duration: s.duration,
         }));
@@ -138,8 +136,7 @@
         tracks = album.songs.map((s: any) => ({
           videoId: s.videoId,
           name: s.name,
-          artist: s.artist?.name || album.artist?.name || "Unknown Artist",
-          artistId: s.artist?.artistId || album.artist?.artistId,
+          artists: s.artists,
           thumbnail:
             album.thumbnails?.at(0)?.url || s.thumbnails?.at(0)?.url || "",
           duration: s.duration,
@@ -149,8 +146,7 @@
         tracks = songs.map((s: any) => ({
           videoId: s.videoId,
           name: s.name,
-          artist: item.name || "Unknown Artist",
-          artistId: item.artistId,
+          artists: s.artists,
           thumbnail: s.thumbnails?.at(0)?.url || "",
           duration: s.duration,
         }));

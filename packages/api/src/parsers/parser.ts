@@ -8,7 +8,8 @@ import {
   PlaylistDetailed,
   ArtistDetailed,
   SongDetailed,
-  VideoDetailed
+  VideoDetailed,
+  ArtistBasic
 } from '../types.js';
 
 export const Filters = {
@@ -149,10 +150,10 @@ export function parseMusicTwoRowItem(r: any): SearchResult | null {
         albumId: browseId,
         playlistId: watchPlaylistId,
         name: title,
-        artist: {
+        artists: [{
           name: artistName,
           artistId: artistId || null
-        },
+        }],
         thumbnails
       } as AlbumDetailed;
 
@@ -161,10 +162,10 @@ export function parseMusicTwoRowItem(r: any): SearchResult | null {
         type: 'PLAYLIST',
         playlistId: browseId,
         name: title,
-        artist: {
+        artists: [{
           name: artistName,
           artistId: artistId || null
-        },
+        }],
         thumbnails
       } as PlaylistDetailed;
 
@@ -182,10 +183,10 @@ export function parseMusicTwoRowItem(r: any): SearchResult | null {
         type: 'PLAYLIST',
         playlistId: browseId,
         name: title,
-        artist: {
+        artists: [{
           name: artistName,
           artistId: artistId || null
-        },
+        }],
         thumbnails
       } as PlaylistDetailed;
 
@@ -202,10 +203,10 @@ export function parseMusicTwoRowItem(r: any): SearchResult | null {
           type: 'SONG',
           videoId: videoId,
           name: title,
-          artist: {
+          artists: [{
             name: finalArtistName,
             artistId: finalArtistId || null
-          },
+          }],
           thumbnails
         } as SongDetailed;
       }
@@ -215,10 +216,10 @@ export function parseMusicTwoRowItem(r: any): SearchResult | null {
           type: 'VIDEO',
           videoId: videoId,
           name: title,
-          artist: {
+          artists: [{
             name: finalArtistName,
             artistId: finalArtistId || null
-          },
+          }],
           thumbnails
         } as VideoDetailed;
       }
@@ -240,4 +241,40 @@ export function parseThumbnails(data: any, ...keys: string[]): Thumbnail[] {
     }
   }
   return list;
+}
+
+export function parseArtists(runs: any[]): ArtistBasic[] {
+  if (runs.length >= 2) {
+    const firstText = traverseString(runs[0], 'text').trim();
+    const secondText = traverseString(runs[1], 'text').trim();
+    const isTypePrefix = ['song', 'video', 'artist', 'album', 'single', 'ep', 'playlist', 'podcast', 'episode'].includes(firstText.toLowerCase());
+    const isSeparator = secondText === '•' || secondText === '|' || secondText === '·';
+    if (isTypePrefix && isSeparator) {
+      runs = runs.slice(2);
+    }
+  }
+
+  const artists: ArtistBasic[] = [];
+  const artistParts: any[] = [];
+
+  for (const run of runs) {
+    if (!run) continue;
+    const text = traverseString(run, 'text').trim();
+    if (text === '•' || text === '|' || text === '·') break;
+    if (Filters.isDuration(run) || Filters.isAlbum(run)) break;
+    artistParts.push(run);
+  }
+
+  for (const run of artistParts) {
+    const text = traverseString(run, 'text').trim();
+    if (!text || text === '&' || text === ',' || text === 'and' || text === 'feat.' || text === 'ft.') continue;
+    const artistId = traverseString(run, 'browseId');
+    // if (!artistId || !artistId.startsWith('UC')) continue;
+    artists.push({
+      artistId,
+      name: text
+    });
+  }
+
+  return artists;
 }

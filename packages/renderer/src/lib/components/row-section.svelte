@@ -27,8 +27,7 @@
       .map((item) => ({
         videoId: item.videoId,
         name: item.name,
-        artist: item.artist?.name || "Unknown Artist",
-        artistId: item.artist?.artistId,
+        artists: item.artists,
         thumbnail: item.thumbnails?.at(0)?.url || "",
         duration: item.duration,
       }));
@@ -39,8 +38,7 @@
       const track: Track = {
         videoId: item.videoId,
         name: item.name,
-        artist: item.artist?.name || "Unknown Artist",
-        artistId: item.artist?.artistId,
+        artists: item.artists,
         thumbnail: item.thumbnails?.at(0)?.url || "",
         duration: item.duration,
       };
@@ -200,7 +198,7 @@
             <p class="line-clamp-1 mt-2 font-semibold leading-tight w-full">
               {item?.name}
             </p>
-            <p class="text-xs opacity-50 w-full">{item?.artist?.name}</p>
+            <p class="text-xs opacity-50 w-full">{item.artists.map((a) => a.name).join(" & ")}</p>
           {:else if item.type === "VIDEO"}
             <div class="rounded-3xl overflow-hidden w-full h-[200px]">
               <Image
@@ -214,7 +212,7 @@
             <p class="line-clamp-1 mt-2 font-semibold leading-tight w-full">
               {item?.name}
             </p>
-            <p class="text-xs opacity-50 w-full">{item?.artist.name}</p>
+            <p class="text-xs opacity-50 w-full">{item.artists.map((a) => a.name).join(" & ")}</p>
           {:else if item.type === "EPISODE"}
             <div class="rounded-3xl overflow-hidden aspect-square w-full">
               <Image

@@ -28,7 +28,7 @@
       fetchLyrics(
         track.videoId,
         track.name,
-        track.artist,
+        track.artists.map((a) => a.name).join(" & "),
         track.duration,
         source,
       );

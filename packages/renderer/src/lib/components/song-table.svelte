@@ -85,20 +85,28 @@
                 {song.name}
               </p>
               <p class="text-xs text-muted-foreground truncate">
-                {#if song.artistId}
-                  <a
-                    href="#/artist/{song.artistId}"
-                    class="hover:underline {isCurrent
-                      ? 'text-primary opacity-80'
-                      : ''}"
-                  >
-                    {song.artist}
-                  </a>
-                {:else}
-                  <span class={isCurrent ? "text-primary opacity-80" : ""}
-                    >{song.artist}</span
-                  >
-                {/if}
+                {#each song.artists as artist, idx}
+                  {#if idx > 0}
+                    <span class={isCurrent ? "text-primary opacity-80" : ""}>
+                      {" & "}
+                    </span>
+                  {/if}
+                  {#if artist.artistId}
+                    <a
+                      href="#/artist/{artist.artistId}"
+                      class="hover:underline {isCurrent
+                        ? 'text-primary opacity-80'
+                        : ''}"
+                      onclick={(e) => e.stopPropagation()}
+                    >
+                      {artist.name}
+                    </a>
+                  {:else}
+                    <span class={isCurrent ? "text-primary opacity-80" : ""}
+                      >{artist.name}</span
+                    >
+                  {/if}
+                {/each}
               </p>
             </div>
           </div>

@@ -75,7 +75,7 @@ export function parseTopResult(shelf: any): SearchResult | null {
           type: 'SONG',
           name: title,
           videoId,
-          artist: { name: artist ?? '', artistId: artistId || null },
+          artists: [{ name: artist ?? '', artistId: artistId || null }],
           album: album ? { name: album, albumId: albumId ?? '' } : null,
           thumbnails
         } as SongDetailed;
@@ -86,7 +86,7 @@ export function parseTopResult(shelf: any): SearchResult | null {
         type: 'VIDEO',
         name: title,
         videoId,
-        artist: { name: '', artistId: null },
+        artists: [],
         thumbnails
       } as VideoDetailed;
     }
@@ -97,7 +97,7 @@ export function parseTopResult(shelf: any): SearchResult | null {
       const buttonCommand = traverse(shelf, 'buttons', 'buttonRenderer', 'command');
       const playlistId = buttonCommand
         ? (traverseString(buttonCommand, 'watchPlaylistEndpoint', 'playlistId') ||
-           traverseString(buttonCommand, 'watchEndpoint', 'playlistId'))
+          traverseString(buttonCommand, 'watchEndpoint', 'playlistId'))
         : null;
       const runs = traverseList(shelf, 'subtitle', 'runs');
       const artist = runs.length > 2 ? traverseString(runs[2], 'text') : null;
@@ -109,7 +109,7 @@ export function parseTopResult(shelf: any): SearchResult | null {
         name: title,
         albumId: browseId ?? '',
         playlistId: playlistId ?? '',
-        artist: { name: artist ?? '', artistId: artistId || null },
+        artists: [{ name: artist ?? '', artistId: artistId || null }],
         thumbnails
       } as AlbumDetailed;
     }
@@ -126,7 +126,7 @@ export function parseTopResult(shelf: any): SearchResult | null {
         type: 'PLAYLIST',
         name: title,
         playlistId: playlistId ?? '',
-        artist: { name: artist ?? '', artistId: artistId || null },
+        artists: [{ name: artist ?? '', artistId: artistId || null }],
         thumbnails
       } as PlaylistDetailed;
     }

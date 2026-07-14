@@ -1,5 +1,5 @@
 import { traverseString, traverseList, traverse } from '../jsonTraverse.js';
-import { Filters, parseThumbnails } from './parser.js';
+import { Filters, parseThumbnails, parseArtists } from './parser.js';
 import * as songParser from './songParser.js';
 import { AlbumFull, AlbumDetailed, ArtistBasic, AlbumBasic, Thumbnail } from '../types.js';
 
@@ -31,7 +31,7 @@ export function parse(data: any, albumId: string): AlbumFull {
     albumId: albumBasic.albumId,
     playlistId: traverseString(data, 'musicPlayButtonRenderer', 'playlistId'),
     name: albumBasic.name,
-    artist: artistBasic,
+    artists: [artistBasic],
     year: processYear(lastSubtitle),
     thumbnails,
     songs
@@ -54,15 +54,19 @@ export function parseSearchResult(item: any): AlbumDetailed {
   const lastCol = columns.length > 0 ? columns[columns.length - 1] : null;
   const lastText = lastCol ? traverseString(lastCol, 'text') : null;
   const artistId = traverseString(artist, 'browseId');
+  const artists = parseArtists(columns);
+  if (artists.length === 0 && artist) {
+    artists.push({
+      name: traverseString(artist, 'text'),
+      artistId: artistId || null
+    });
+  }
 
   return {
     type: 'ALBUM',
     albumId,
     playlistId,
-    artist: {
-      name: traverseString(artist, 'text'),
-      artistId: artistId || null
-    },
+    artists,
     year: processYear(lastText),
     name: traverseString(title, 'text'),
     thumbnails: parseThumbnails(item, 'thumbnails')
@@ -81,7 +85,7 @@ export function parseArtistAlbum(item: any, artistBasic: ArtistBasic): AlbumDeta
     albumId,
     playlistId: traverseString(item, 'thumbnailOverlay', 'playlistId'),
     name: traverseString(item, 'title', 'text'),
-    artist: artistBasic,
+    artists: [artistBasic],
     year: processYear(lastSubtitle),
     thumbnails: parseThumbnails(item, 'thumbnails')
   };
@@ -99,7 +103,7 @@ export function parseArtistTopAlbum(item: any, artistBasic: ArtistBasic): AlbumD
     albumId,
     playlistId: traverseString(item, 'musicPlayButtonRenderer', 'playlistId'),
     name: traverseString(item, 'title', 'text'),
-    artist: artistBasic,
+    artists: [artistBasic],
     year: processYear(lastSubtitle),
     thumbnails: parseThumbnails(item, 'thumbnails')
   };
@@ -117,10 +121,10 @@ export function parseExploreAlbum(item: any): AlbumDetailed | null {
     albumId: traverseString(item, 'musicTwoRowItemRenderer', 'navigationEndpoint', 'browseEndpoint', 'browseId'),
     playlistId: traverseString(item, 'musicTwoRowItemRenderer', 'thumbnailOverlay', 'musicItemThumbnailOverlayRenderer', 'content', 'musicPlayButtonRenderer', 'playNavigationEndpoint', 'watchPlaylistEndpoint', 'playlistId'),
     name: title,
-    artist: {
+    artists: [{
       name: artistName,
       artistId: subtitleRuns.length > 0 ? traverseString(subtitleRuns[0], 'browseId') : null
-    },
+    }],
     thumbnails: parseThumbnails(item, 'musicTwoRowItemRenderer', 'thumbnailRenderer', 'musicThumbnailRenderer', 'thumbnail', 'thumbnails')
   };
 }
@@ -137,10 +141,10 @@ export function parseLibraryAlbum(item: any): AlbumDetailed | null {
     albumId: traverseString(item, 'musicTwoRowItemRenderer', 'navigationEndpoint', 'browseEndpoint', 'browseId'),
     playlistId: traverseString(item, 'musicTwoRowItemRenderer', 'thumbnailOverlay', 'musicItemThumbnailOverlayRenderer', 'content', 'musicPlayButtonRenderer', 'playNavigationEndpoint', 'watchPlaylistEndpoint', 'playlistId'),
     name: title,
-    artist: {
+    artists: [{
       name: artistName,
       artistId: subtitleRuns.length > 0 ? traverseString(subtitleRuns[0], 'browseId') : null
-    },
+    }],
     thumbnails: parseThumbnails(item, 'musicTwoRowItemRenderer', 'thumbnailRenderer', 'musicThumbnailRenderer', 'thumbnail', 'thumbnails')
   };
 }

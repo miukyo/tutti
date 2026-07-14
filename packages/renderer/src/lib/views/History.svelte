@@ -22,9 +22,7 @@
       groups[key].push({
         videoId: item.videoId,
         name: item.title,
-        artist:
-          item.artists.map((a: any) => a.name).join(", ") || "Unknown Artist",
-        artistId: item.artists[0]?.artistId || null,
+        artists: item.artists,
         thumbnail: item.thumbnails?.[0]?.url || "",
         duration: null,
       });

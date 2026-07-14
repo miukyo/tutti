@@ -24,7 +24,7 @@ export interface AlbumBasic {
 export interface SongDetailed extends BaseSearchResult {
   type: 'SONG';
   videoId: string;
-  artist: ArtistBasic;
+  artists: ArtistBasic[];
   album?: AlbumBasic | null;
   duration?: number | null;
 }
@@ -32,7 +32,7 @@ export interface SongDetailed extends BaseSearchResult {
 export interface VideoDetailed extends BaseSearchResult {
   type: 'VIDEO';
   videoId: string;
-  artist: ArtistBasic;
+  artists: ArtistBasic[];
   duration?: number | null;
   setVideoId?: string | null;
 }
@@ -46,14 +46,14 @@ export interface AlbumDetailed extends BaseSearchResult {
   type: 'ALBUM';
   albumId: string;
   playlistId: string;
-  artist: ArtistBasic;
+  artists: ArtistBasic[];
   year?: number | null;
 }
 
 export interface PlaylistDetailed extends BaseSearchResult {
   type: 'PLAYLIST';
   playlistId: string;
-  artist: ArtistBasic;
+  artists: ArtistBasic[];
   editable?: boolean;
 }
 
@@ -77,7 +77,7 @@ export interface SongFull {
   type: 'SONG';
   videoId: string;
   name: string;
-  artist: ArtistBasic;
+  artists: ArtistBasic[];
   duration: number;
   thumbnails: Thumbnail[];
   streamManifest?: StreamManifest | null;
@@ -87,7 +87,7 @@ export interface VideoFull {
   type: 'VIDEO';
   videoId: string;
   name: string;
-  artist: ArtistBasic;
+  artists: ArtistBasic[];
   duration: number;
   thumbnails: Thumbnail[];
   unlisted: boolean;
@@ -100,7 +100,7 @@ export interface UpNextsDetails {
   type: 'SONG';
   videoId: string;
   title: string;
-  artists: string;
+  artists: ArtistBasic[];
   duration: string;
   thumbnail: string;
 }
@@ -125,7 +125,7 @@ export interface AlbumFull {
   albumId: string;
   playlistId: string;
   name: string;
-  artist: ArtistBasic;
+  artists: ArtistBasic[];
   year?: number | null;
   thumbnails: Thumbnail[];
   songs: SongDetailed[];
@@ -135,7 +135,7 @@ export interface PlaylistFull {
   type: 'PLAYLIST';
   playlistId: string;
   name: string;
-  artist: ArtistBasic;
+  artists: ArtistBasic[];
   videoCount: number;
   thumbnails: Thumbnail[];
   editable?: boolean;

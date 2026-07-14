@@ -1,5 +1,5 @@
 import { traverseString, traverseList } from '../jsonTraverse.js';
-import { Filters, parseDuration, parseThumbnails } from './parser.js';
+import { Filters, parseDuration, parseThumbnails, parseArtists } from './parser.js';
 import * as streamParser from './streamParser.js';
 import {
   SongFull,
@@ -26,10 +26,10 @@ export function parse(data: any): SongFull {
     type: 'SONG',
     videoId: traverseString(data, 'videoDetails', 'videoId'),
     name: traverseString(data, 'videoDetails', 'title'),
-    artist: {
+    artists: [{
       name: traverseString(data, 'author'),
       artistId: traverseString(data, 'videoDetails', 'channelId') || null
-    },
+    }],
     duration,
     thumbnails: parseThumbnails(data, 'videoDetails', 'thumbnails'),
     streamManifest
@@ -55,22 +55,17 @@ export function parseSearchResult(item: any): SearchResult | null {
   }
 
   const subtitleRuns = traverseList(columns[1], 'runs');
-  const artistRun = subtitleRuns.find(run => run && run.navigationEndpoint);
-  const targetRun = artistRun || (subtitleRuns.length > 0 ? subtitleRuns[0] : null);
-  const artistName = targetRun ? traverseString(targetRun, 'text') : '';
-  const artistId = targetRun ? traverseString(targetRun, 'browseId') : null;
+  const artists = parseArtists(subtitleRuns);
+  const primaryArtist = artists[0] || { name: 'Unknown Artist', artistId: null };
 
-  if (artistName === "Song") return null;
+  if (primaryArtist.name === "Song") return null;
 
   if (type === 'MUSIC_VIDEO_TYPE_ATV') {
     return {
       type: 'SONG',
       videoId: traverseString(item, 'playlistItemData', 'videoId'),
       name: traverseString(title, 'text'),
-      artist: {
-        name: artistName,
-        artistId: artistId || null
-      },
+      artists,
       album: albumBasic,
       duration: parseDuration(durationText),
       thumbnails: parseThumbnails(item, 'thumbnails')
@@ -80,10 +75,7 @@ export function parseSearchResult(item: any): SearchResult | null {
       type: 'VIDEO',
       videoId: traverseString(item, 'playlistItemData', 'videoId'),
       name: traverseString(title, 'text'),
-      artist: {
-        name: artistName,
-        artistId: artistId || null
-      },
+      artists,
       duration: parseDuration(durationText),
       thumbnails: parseThumbnails(item, 'thumbnails')
     } as VideoDetailed;
@@ -107,11 +99,14 @@ export function parseArtistSong(item: any, artistBasic: ArtistBasic): SongDetail
     };
   }
 
+  const parsedArtists = parseArtists(columns);
+  const artists = parsedArtists.length > 0 ? parsedArtists : [artistBasic];
+
   return {
     type: 'SONG',
     videoId: traverseString(item, 'playlistItemData', 'videoId'),
     name: traverseString(title, 'text'),
-    artist: artistBasic,
+    artists,
     album: albumBasic,
     duration: parseDuration(durationText),
     thumbnails: parseThumbnails(item, 'thumbnails')
@@ -132,11 +127,14 @@ export function parseArtistTopSong(item: any, artistBasic: ArtistBasic): SongDet
     };
   }
 
+  const parsedArtists = parseArtists(columns);
+  const artists = parsedArtists.length > 0 ? parsedArtists : [artistBasic];
+
   return {
     type: 'SONG',
     videoId: traverseString(item, 'playlistItemData', 'videoId'),
     name: traverseString(title, 'text'),
-    artist: artistBasic,
+    artists,
     album: albumBasic,
     duration: null,
     thumbnails: parseThumbnails(item, 'thumbnails')
@@ -144,16 +142,20 @@ export function parseArtistTopSong(item: any, artistBasic: ArtistBasic): SongDet
 }
 
 export function parseAlbumSong(item: any, artistBasic: ArtistBasic, albumBasic: AlbumBasic, thumbnails: Thumbnail[]): SongDetailed {
-  const title = traverseList(item, 'flexColumns', 'runs').find(Filters.isTitle);
+  const runs = traverseList(item, 'flexColumns', 'runs');
+  const title = runs.find(Filters.isTitle);
   const durationNode = traverseList(item, 'fixedColumns', 'runs').find(Filters.isDuration);
 
   const durationText = durationNode ? traverseString(durationNode, 'text') : null;
+
+  const parsedArtists = parseArtists(runs);
+  const artists = parsedArtists.length > 0 ? parsedArtists : [artistBasic];
 
   return {
     type: 'SONG',
     videoId: traverseString(item, 'playlistItemData', 'videoId'),
     name: traverseString(title, 'text'),
-    artist: artistBasic,
+    artists,
     album: albumBasic,
     duration: parseDuration(durationText),
     thumbnails: thumbnails
@@ -161,10 +163,19 @@ export function parseAlbumSong(item: any, artistBasic: ArtistBasic, albumBasic: 
 }
 
 export function parseLibrarySong(item: any): SongDetailed | null {
-  const columns = traverseList(item, 'flexColumns', 'runs');
+  const flexCols = traverseList(item, 'flexColumns');
+  if (flexCols.length === 0) return null;
 
+  const columns = traverseList(item, 'flexColumns', 'runs');
   const title = columns.length > 0 ? columns[0] : null;
-  const artist = columns.find(Filters.isArtist) || (columns.length > 3 ? columns[3] : null);
+
+  if (traverseString(title, 'text').startsWith('Shuffle')) return null;
+
+  const artistColumn = flexCols.find(Filters.isArtist) || (flexCols.length > 1 ? flexCols[1] : null);
+  const artistRuns = artistColumn ? traverseList(artistColumn, 'runs') : [];
+  const artists = parseArtists(artistRuns);
+  const primaryArtist = artists[0] || { name: 'Unknown Artist', artistId: null };
+
   const album = columns.find(Filters.isAlbum);
   const durationNode = columns.find(Filters.isDuration);
 
@@ -178,18 +189,11 @@ export function parseLibrarySong(item: any): SongDetailed | null {
     };
   }
 
-  if (traverseString(title, 'text').startsWith('Shuffle')) return null;
-
-  const artistId = traverseString(artist, 'browseId');
-
   return {
     type: 'SONG',
     videoId: traverseString(item, 'playlistItemData', 'videoId'),
     name: traverseString(title, 'text'),
-    artist: {
-      name: traverseString(artist, 'text'),
-      artistId: artistId || null
-    },
+    artists,
     album: albumBasic,
     duration: parseDuration(durationText),
     thumbnails: parseThumbnails(item, 'thumbnails')

@@ -40,8 +40,7 @@
     return videos.map((v) => ({
       videoId: v.videoId,
       name: v.name,
-      artist: v.artist?.name || "Unknown Artist",
-      artistId: v.artist?.artistId,
+      artists: v.artists,
       thumbnail: v.thumbnails?.at(0)?.url || "",
       duration: v.duration,
       setVideoId: v.setVideoId,
@@ -119,16 +118,25 @@
             {playlist.name}
           </h1>
           <div class="flex items-center gap-2 text-sm text-muted-foreground">
-            {#if playlist.artist?.name}
-              <a
-                href="#/artist/{playlist.artist.artistId}"
-                class="hover:underline font-medium text-foreground"
-              >
-                {playlist.artist.name}
-              </a>
+            {#if playlist.artists && playlist.artists.length > 0}
+              {#each playlist.artists as artist, idx}
+                {#if idx > 0}
+                  <span>&bull;</span>
+                {/if}
+                {#if artist.artistId}
+                  <a
+                    href="#/artist/{artist.artistId}"
+                    class="hover:underline font-medium text-foreground"
+                  >
+                    {artist.name}
+                  </a>
+                {:else}
+                  <span class="font-medium text-foreground">{artist.name}</span>
+                {/if}
+              {/each}
               <span>•</span>
             {/if}
-            <span>{playlist.videoCount || videos.length} tracks</span>
+            <span>{videos.length} tracks</span>
           </div>
           <div class="flex items-center gap-2 mt-4">
             <Button size="lg" class="rounded-full gap-2" onclick={playPlaylist}>

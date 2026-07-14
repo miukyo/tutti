@@ -4,8 +4,7 @@ import { tick } from "svelte";
 export interface Track {
   videoId: string;
   name: string;
-  artist: string;
-  artistId?: string | null;
+  artists: { name: string; artistId: string | null }[];
   thumbnail: string;
   duration?: number | null;
   setVideoId?: string | null;
@@ -339,7 +338,7 @@ class PlayerStore {
 
 
       updateDiscordPresence({
-        state: this.currentTrack!.artist,
+        state: this.currentTrack!.artists.map(a => a.name).join(" & "),
         details: this.currentTrack!.name,
         startTimestamp,
         endTimestamp,
@@ -645,7 +644,7 @@ class PlayerStore {
         const recommendedTracks: Track[] = upNexts.map((item) => ({
           videoId: item.videoId,
           name: item.title,
-          artist: item.artists,
+          artists: item.artists,
           thumbnail: item.thumbnail,
           duration: null,
         }));
@@ -750,7 +749,7 @@ class PlayerStore {
                 newTracks.push({
                   videoId: item.videoId,
                   name: item.title,
-                  artist: item.artists,
+                  artists: item.artists,
                   thumbnail: `https://i.ytimg.com/vi/${item.videoId}/hqdefault.jpg`,
                   duration: this.parseDurationStr(item.duration)
                 });
@@ -796,7 +795,7 @@ class PlayerStore {
     if (typeof navigator !== "undefined" && "mediaSession" in navigator && this.currentTrack) {
       navigator.mediaSession.metadata = new MediaMetadata({
         title: this.currentTrack.name,
-        artist: this.currentTrack.artist,
+        artist: this.currentTrack.artists.map(a => a.name).join(" & "),
         artwork: [
           {
             src: this.currentTrack.thumbnail || `https://i.ytimg.com/vi/${this.currentTrack.videoId}/hqdefault.jpg`,

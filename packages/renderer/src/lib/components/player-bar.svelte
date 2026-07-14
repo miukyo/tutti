@@ -179,7 +179,24 @@
                 <p
                   class="text-[10px] text-muted-foreground truncate leading-tight"
                 >
-                  {currentTrack.artist}
+                  {#each currentTrack.artists as artist, idx}
+                    {#if idx > 0}
+                      <span>{" & "}</span>
+                    {/if}
+                    {#if artist.artistId}
+                      <!-- svelte-ignore a11y_click_events_have_key_events -->
+                      <!-- svelte-ignore a11y_no_static_element_interactions -->
+                      <a
+                        href="#/artist/{artist.artistId}"
+                        class="hover:underline"
+                        onclick={(e) => e.stopPropagation()}
+                      >
+                        {artist.name}
+                      </a>
+                    {:else}
+                      <span>{artist.name}</span>
+                    {/if}
+                  {/each}
                 </p>
               </div>
             </div>
@@ -217,8 +234,8 @@
           {/if}
         </Button>
         <Slider
-          class="w-0 2xl:w-30 2xl:opacity-100 opacity-0 group-hover/volume:w-30 group-hover:opacity-100 transition-all duration-300 overflow-hidden
-          **:data-slider-thumb:w-0 **:data-slider-thumb:opacity-0  **:data-[slot='slider-track']:bg-foreground/10 **:data-[slot='slider-range']:bg-foreground"
+          class={`w-0 ${!isExtended ? "2xl:w-30 2xl:opacity-100" : ""} opacity-0 group-hover/volume:w-30 group-hover:opacity-100 transition-all duration-300 overflow-hidden
+          **:data-slider-thumb:w-0 **:data-slider-thumb:opacity-0  **:data-[slot='slider-track']:bg-foreground/10 **:data-[slot='slider-range']:bg-foreground`}
           type="single"
           orientation="horizontal"
           value={player.isMuted ? 0 : player.volume}

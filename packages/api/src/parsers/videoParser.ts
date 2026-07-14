@@ -1,5 +1,5 @@
 import { traverseString, traverseList } from '../jsonTraverse.js';
-import { Filters, parseDuration, parseThumbnails } from './parser.js';
+import { Filters, parseDuration, parseThumbnails, parseArtists } from './parser.js';
 import { VideoFull, VideoDetailed, ArtistBasic } from '../types.js';
 
 export function parse(data: any): VideoFull {
@@ -18,10 +18,10 @@ export function parse(data: any): VideoFull {
     type: 'VIDEO',
     videoId: traverseString(data, 'videoDetails', 'videoId'),
     name: traverseString(data, 'videoDetails', 'title'),
-    artist: {
+    artists: [{
       artistId: traverseString(data, 'videoDetails', 'channelId') || null,
       name: traverseString(data, 'author')
-    },
+    }],
     duration,
     thumbnails: parseThumbnails(data, 'videoDetails', 'thumbnails'),
     unlisted,
@@ -31,24 +31,25 @@ export function parse(data: any): VideoFull {
   };
 }
 
-export function parseSearchResult(item: any): VideoDetailed {
+export function parseSearchResult(item: any): VideoDetailed | null {
   const columns = traverseList(item, 'flexColumns', 'runs');
 
   const title = columns.find(Filters.isTitle);
-  const artist = columns.find(Filters.isArtist) || (columns.length > 1 ? columns[1] : null);
   const durationNode = columns.find(Filters.isDuration);
 
   const durationText = durationNode ? traverseString(durationNode, 'text') : null;
-  const artistId = traverseString(artist, 'browseId');
+
+  if (!title) return null;
+
+  const artists = parseArtists(columns);
+  const artistNode = columns.find(Filters.isArtist) || (columns.length > 1 ? columns[1] : null);
+  const primaryArtist = artists[0] || (artistNode ? { name: traverseString(artistNode, 'text'), artistId: traverseString(artistNode, 'browseId') || null } : { name: 'Unknown Artist', artistId: null });
 
   return {
     type: 'VIDEO',
     videoId: traverseString(item, 'playNavigationEndpoint', 'videoId'),
     name: traverseString(title, 'text'),
-    artist: {
-      artistId: artistId || null,
-      name: traverseString(artist, 'text')
-    },
+    artists,
     duration: parseDuration(durationText),
     thumbnails: parseThumbnails(item, 'thumbnails')
   };
@@ -59,7 +60,7 @@ export function parseArtistTopVideo(item: any, artistBasic: ArtistBasic): VideoD
     type: 'VIDEO',
     videoId: traverseString(item, 'videoId'),
     name: traverseString(item, 'runs', 'text'),
-    artist: artistBasic,
+    artists: [artistBasic],
     duration: null,
     thumbnails: parseThumbnails(item, 'thumbnails')
   };
@@ -70,7 +71,6 @@ export function parsePlaylistVideo(item: any): VideoDetailed | null {
   const fixedColumns = traverseList(item, 'fixedColumns', 'runs');
 
   const title = flexColumns.find(Filters.isTitle) || (flexColumns.length > 0 ? flexColumns[0] : null);
-  const artist = flexColumns.find(Filters.isArtist) || (flexColumns.length > 1 ? flexColumns[1] : null);
   const durationNode = fixedColumns.find(Filters.isDuration);
 
   const videoId1 = traverseString(item, 'playNavigationEndpoint', 'videoId');
@@ -88,7 +88,9 @@ export function parsePlaylistVideo(item: any): VideoDetailed | null {
     return null;
   }
 
-  const artistId = traverseString(artist, 'browseId');
+  const artists = parseArtists(flexColumns);
+  const artistNode = flexColumns.find(Filters.isArtist) || (flexColumns.length > 1 ? flexColumns[1] : null);
+  const primaryArtist = artists[0] || (artistNode ? { name: traverseString(artistNode, 'text'), artistId: traverseString(artistNode, 'browseId') || null } : { name: 'Unknown Artist', artistId: null });
 
   const setVideoId = traverseString(item, 'playlistItemData', 'playlistSetVideoId');
 
@@ -96,10 +98,7 @@ export function parsePlaylistVideo(item: any): VideoDetailed | null {
     type: 'VIDEO',
     videoId: videoId1 || videoId2!,
     name: traverseString(title, 'text'),
-    artist: {
-      name: traverseString(artist, 'text'),
-      artistId: artistId || null
-    },
+    artists,
     duration: parseDuration(durationNode ? traverseString(durationNode, 'text') : null),
     thumbnails,
     setVideoId: setVideoId || null

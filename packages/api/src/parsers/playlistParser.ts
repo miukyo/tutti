@@ -1,5 +1,5 @@
 import { traverseString, traverseList, traverse } from '../jsonTraverse.js';
-import { Filters, parseThumbnails } from './parser.js';
+import { Filters, parseThumbnails, parseArtists } from './parser.js';
 import { PlaylistFull, PlaylistDetailed, ArtistBasic } from '../types.js';
 
 export function parse(data: any, playlistId: string): PlaylistFull {
@@ -23,10 +23,10 @@ export function parse(data: any, playlistId: string): PlaylistFull {
     type: 'PLAYLIST',
     playlistId,
     name: traverseString(data, 'tabs', 'title', 'text'),
-    artist: {
+    artists: [{
       name: traverseString(artistNode, 'text'),
       artistId: artistId || null
-    },
+    }],
     videoCount,
     thumbnails: parseThumbnails(data, 'tabs', 'thumbnails'),
     editable: isEditable
@@ -39,15 +39,19 @@ export function parseSearchResult(item: any): PlaylistDetailed {
   const artist = columns.find(Filters.isArtist) || (columns.length > 3 ? columns[3] : null);
 
   const artistId = traverseString(artist, 'browseId');
+  const artists = parseArtists(columns);
+  if (artists.length === 0 && artist) {
+    artists.push({
+      name: traverseString(artist, 'text'),
+      artistId: artistId || null
+    });
+  }
 
   return {
     type: 'PLAYLIST',
     playlistId: traverseString(item, 'overlay', 'playlistId'),
     name: traverseString(title, 'text'),
-    artist: {
-      name: traverseString(artist, 'text'),
-      artistId: artistId || null
-    },
+    artists,
     thumbnails: parseThumbnails(item, 'thumbnails')
   };
 }
@@ -57,7 +61,7 @@ export function parseArtistFeaturedOn(item: any, artistBasic: ArtistBasic): Play
     type: 'PLAYLIST',
     playlistId: traverseString(item, 'navigationEndpoint', 'browseId'),
     name: traverseString(item, 'runs', 'text'),
-    artist: artistBasic,
+    artists: [artistBasic],
     thumbnails: parseThumbnails(item, 'thumbnails')
   };
 }
@@ -70,7 +74,7 @@ export function parseMoodPlaylist(item: any): PlaylistDetailed | null {
     type: 'PLAYLIST',
     playlistId: traverseString(item, 'musicTwoRowItemRenderer', 'navigationEndpoint', 'browseEndpoint', 'browseId'),
     name: title,
-    artist: { name: '', artistId: null },
+    artists: [],
     thumbnails: parseThumbnails(item, 'musicTwoRowItemRenderer', 'thumbnailRenderer', 'musicThumbnailRenderer', 'thumbnail', 'thumbnails')
   };
 }
@@ -109,7 +113,7 @@ export function parseLibraryPlaylist(item: any, ownerName: string | null = null)
     type: 'PLAYLIST',
     playlistId: playlistId,
     name: title,
-    artist: { name: '', artistId: null },
+    artists: [],
     thumbnails: parseThumbnails(item, 'musicTwoRowItemRenderer', 'thumbnailRenderer', 'musicThumbnailRenderer', 'thumbnail', 'thumbnails'),
     editable: isCreatorPlaylist
   };
@@ -123,10 +127,10 @@ export function parseLibraryPodcast(item: any): PlaylistDetailed | null {
     type: 'PLAYLIST',
     playlistId: traverseString(item, 'musicTwoRowItemRenderer', 'navigationEndpoint', 'browseEndpoint', 'browseId'),
     name: title,
-    artist: {
+    artists: [{
       name: traverseString(item, 'musicTwoRowItemRenderer', 'subtitle', 'runs', 'text'),
       artistId: null
-    },
+    }],
     thumbnails: parseThumbnails(item, 'musicTwoRowItemRenderer', 'thumbnailRenderer', 'musicThumbnailRenderer', 'thumbnail', 'thumbnails')
   };
 }

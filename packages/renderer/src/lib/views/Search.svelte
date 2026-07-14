@@ -77,8 +77,7 @@
     return songList.map((s) => ({
       videoId: s.videoId,
       name: s.name,
-      artist: s.artist?.name || "Unknown Artist",
-      artistId: s.artist?.artistId,
+      artists: s.artists,
       thumbnail: s.thumbnails?.at(0)?.url || "",
       duration: s.duration,
     }));

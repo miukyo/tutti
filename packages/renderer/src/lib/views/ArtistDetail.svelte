@@ -42,8 +42,7 @@
     return fetchedSongs.map((s) => ({
       videoId: s.videoId,
       name: s.name,
-      artist: artist?.name || "Unknown Artist",
-      artistId: artist?.artistId,
+      artists: s.artists,
       thumbnail: s.thumbnails?.at(0)?.url || "",
       duration: s.duration,
     }));
@@ -80,12 +79,16 @@
           >
             {artist.name}
           </h1>
-          <p class="text-xs opacity-50 max-w-4xl">{artist.description}</p>
-          <div class="flex items-center gap-4 mt-4">
-            <Button size="lg" class="rounded-full gap-2" onclick={playsongs}>
-              <PlayIcon class="size-5 fill-current" /> Play
-            </Button>
-          </div>
+          <p class="text-xs opacity-50 max-w-2xl line-clamp-3">
+            {artist.description}
+          </p>
+          {#if songs.length > 0}
+            <div class="flex items-center gap-4 mt-4">
+              <Button size="lg" class="rounded-full gap-2" onclick={playsongs}>
+                <PlayIcon class="size-5 fill-current" /> Play
+              </Button>
+            </div>
+          {/if}
         </div>
       </div>
 
