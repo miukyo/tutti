@@ -268,8 +268,14 @@ export function parseArtists(runs: any[]): ArtistBasic[] {
   for (const run of artistParts) {
     const text = traverseString(run, 'text').trim();
     if (!text || text === '&' || text === ',' || text === 'and' || text === 'feat.' || text === 'ft.') continue;
+
+    const lowerText = text.toLowerCase();
+    if (lowerText.includes('play') || lowerText.includes('view') || lowerText.includes('stream')) continue;
+    if (/^\d+[\d.,]*[kmb]?$/i.test(text)) continue;
+    if (/^\d{4}$/.test(text)) continue;
+
     const artistId = traverseString(run, 'browseId');
-    // if (!artistId || !artistId.startsWith('UC')) continue;
+    if (artistId && !artistId.startsWith('UC')) continue;
     artists.push({
       artistId,
       name: text
