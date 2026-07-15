@@ -36,8 +36,19 @@ class PlayerStore {
       this.#showExtended = val;
     }
   }
-  playbackRate = $state(1.0);
-  lyricsFontSize = $state<'small' | 'medium' | 'large'>('medium');
+  hotkeys = $state({
+    togglePlay: " ",
+    seekBackward: "ArrowLeft",
+    seekForward: "ArrowRight",
+    seekForwardAlt: "ArrowUp",
+    seekBackwardAlt: "ArrowDown",
+    toggleMute: "m",
+    nextTrack: "n",
+    prevTrack: "p",
+  });
+  lyricsFontSize = $state<number>(1.0);
+  lyricsFontSizeExtended = $state<number>(1.0);
+  lyricsFontSizeFloating = $state<number>(1.0);
   repeatMode = $state<'off' | 'all' | 'one'>('off');
   isShuffled = $state(false);
   originalQueue = $state<Track[]>([]);
@@ -137,9 +148,6 @@ class PlayerStore {
       this.audio.addEventListener("playing", () => {
         this.clearStuckTimeout();
         this.isBuffering = false;
-        if (this.audio) {
-          this.audio.playbackRate = this.playbackRate;
-        }
         this.#updateMediaSessionPlaybackState();
       });
 
@@ -182,54 +190,43 @@ class PlayerStore {
           return;
         }
 
-        switch (e.key) {
-          case " ":
-            e.preventDefault();
-            this.togglePlay();
-            break;
-          case "ArrowLeft":
-            e.preventDefault();
-            this.seek(Math.max(0, this.currentTime - 5));
-            break;
-          case "ArrowRight":
-            e.preventDefault();
-            this.seek(Math.min(this.duration, this.currentTime + 5));
-            break;
-          case "ArrowUp":
-            e.preventDefault();
-            this.seek(Math.max(0, this.currentTime + 5));
-            break;
-          case "ArrowDown":
-            e.preventDefault();
-            this.seek(Math.max(0, this.currentTime - 5));
-            break;
-          case "m":
-          case "M":
-            this.toggleMute();
-            break;
-          case "n":
-          case "N":
-            this.next();
-            break;
-          case "p":
-          case "P":
-            this.prev();
-            break;
+        const key = e.key.toLowerCase();
+        const matches = (actionKey: string) => actionKey && actionKey.toLowerCase() === key;
+
+        if (matches(this.hotkeys.togglePlay)) {
+          e.preventDefault();
+          this.togglePlay();
+        } else if (matches(this.hotkeys.seekBackward)) {
+          e.preventDefault();
+          this.seek(Math.max(0, this.currentTime - 5));
+        } else if (matches(this.hotkeys.seekForward)) {
+          e.preventDefault();
+          this.seek(Math.min(this.duration, this.currentTime + 5));
+        } else if (matches(this.hotkeys.seekForwardAlt)) {
+          e.preventDefault();
+          this.seek(Math.max(0, this.currentTime + 5));
+        } else if (matches(this.hotkeys.seekBackwardAlt)) {
+          e.preventDefault();
+          this.seek(Math.max(0, this.currentTime - 5));
+        } else if (matches(this.hotkeys.toggleMute)) {
+          e.preventDefault();
+          this.toggleMute();
+        } else if (matches(this.hotkeys.nextTrack)) {
+          e.preventDefault();
+          this.next();
+        } else if (matches(this.hotkeys.prevTrack)) {
+          e.preventDefault();
+          this.prev();
         }
       });
     }
   }
 
-  setPlaybackRate(rate: number) {
-    this.playbackRate = rate;
-    if (this.audio) {
-      this.audio.playbackRate = rate;
-    }
-    this.saveState();
-  }
 
-  setLyricsFontSize(size: 'small' | 'medium' | 'large') {
-    this.lyricsFontSize = size;
+  setLyricsFontSize(mode: 'sidebar' | 'extended' | 'floating', size: number) {
+    if (mode === 'sidebar') this.lyricsFontSize = size;
+    else if (mode === 'extended') this.lyricsFontSizeExtended = size;
+    else if (mode === 'floating') this.lyricsFontSizeFloating = size;
     this.saveState();
   }
 
@@ -263,8 +260,21 @@ class PlayerStore {
         if (typeof state.currentIndex === "number") this.currentIndex = state.currentIndex;
         if (typeof state.currentTime === "number") this.currentTime = state.currentTime;
         if (typeof state.duration === "number") this.duration = state.duration;
-        if (typeof state.playbackRate === "number") this.playbackRate = state.playbackRate;
-        if (state.lyricsFontSize) this.lyricsFontSize = state.lyricsFontSize;
+        if (state.hotkeys) this.hotkeys = { ...this.hotkeys, ...state.hotkeys };
+        if (typeof state.lyricsFontSize === "number") this.lyricsFontSize = state.lyricsFontSize;
+        else if (state.lyricsFontSize === "small") this.lyricsFontSize = 0.8;
+        else if (state.lyricsFontSize === "large") this.lyricsFontSize = 1.25;
+        else if (state.lyricsFontSize === "medium") this.lyricsFontSize = 1.0;
+
+        if (typeof state.lyricsFontSizeExtended === "number") this.lyricsFontSizeExtended = state.lyricsFontSizeExtended;
+        else if (state.lyricsFontSizeExtended === "small") this.lyricsFontSizeExtended = 0.8;
+        else if (state.lyricsFontSizeExtended === "large") this.lyricsFontSizeExtended = 1.25;
+        else if (state.lyricsFontSizeExtended === "medium") this.lyricsFontSizeExtended = 1.0;
+
+        if (typeof state.lyricsFontSizeFloating === "number") this.lyricsFontSizeFloating = state.lyricsFontSizeFloating;
+        else if (state.lyricsFontSizeFloating === "small") this.lyricsFontSizeFloating = 0.8;
+        else if (state.lyricsFontSizeFloating === "large") this.lyricsFontSizeFloating = 1.25;
+        else if (state.lyricsFontSizeFloating === "medium") this.lyricsFontSizeFloating = 1.0;
         if (state.repeatMode) this.repeatMode = state.repeatMode;
         if (typeof state.isShuffled === "boolean") this.isShuffled = state.isShuffled;
         if (Array.isArray(state.originalQueue)) this.originalQueue = state.originalQueue;
@@ -287,8 +297,10 @@ class PlayerStore {
         currentTime: this.currentTime,
         duration: this.duration,
         activeSidebar: this.activeSidebar,
-        playbackRate: this.playbackRate,
+        hotkeys: this.hotkeys,
         lyricsFontSize: this.lyricsFontSize,
+        lyricsFontSizeExtended: this.lyricsFontSizeExtended,
+        lyricsFontSizeFloating: this.lyricsFontSizeFloating,
         repeatMode: this.repeatMode,
         isShuffled: this.isShuffled,
         originalQueue: this.originalQueue,
@@ -575,6 +587,9 @@ class PlayerStore {
           await new Promise((resolve) => setTimeout(resolve, 1000 * Math.pow(2, attempt - 1)));
         } else {
           console.error(`Failed to play track after ${maxRetries} attempts.`);
+          if (!signal.aborted && this.currentTrack?.videoId === track.videoId) {
+            this.next();
+          }
         }
       }
     }
@@ -619,7 +634,7 @@ class PlayerStore {
     this.isPlaying = autoPlay;
     this.isBuffering = true;
     this.currentTime = startTime;
-    this.duration = track.duration || 0;
+    this.duration = track.duration || (this.audio && !isNaN(this.audio.duration) && isFinite(this.audio.duration) ? this.audio.duration : 0);
     this.likeStatus = this.likedSongIds.includes(track.videoId) ? 'Like' : 'Indifferent';
     this.saveState();
     this.#updateMediaSessionMetadata();

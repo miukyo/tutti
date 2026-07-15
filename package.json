@@ -1,7 +1,7 @@
 {
   "name": "Tutti",
   "description": "Tutti is a beautifully designed desktop client for YouTube Music",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "private": true,
   "type": "module",
   "author": {

@@ -44,7 +44,7 @@
     />
 
     <!-- Top bar -->
-    <header class="absolute w-full flex items-center gap-2 px-8 py-6 z-200">
+    <header class="absolute w-fit flex items-center gap-2 px-8 py-6 z-200">
       <Button
         size="icon"
         variant="outline-blur"

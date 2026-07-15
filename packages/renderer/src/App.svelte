@@ -30,6 +30,7 @@
     PlusIcon,
     Gamepad2Icon,
     RadioIcon,
+    SettingsIcon,
   } from "@lucide/svelte/icons";
   import {
     ytmusic,
@@ -39,6 +40,8 @@
     getAppVersion,
     restartAndInstall,
     onUpdateDownloaded,
+    updatePlayerState,
+    onRequestPlayerState,
   } from "@app/preload";
   import { Button } from "$lib/components/ui/button";
   import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
@@ -69,10 +72,13 @@
   import ExtendedPlayer from "$lib/components/extended-player.svelte";
   import * as Select from "$lib/components/ui/select";
   import CreatePlaylistDialog from "$lib/components/create-playlist-dialog.svelte";
+  import FloatingLyrics from "$lib/views/FloatingLyrics.svelte";
+  import SettingsDialog from "$lib/components/settings-dialog.svelte";
 
   let accountInfo = $state<AccountInfo | null>(null);
   let sidebarPlaylists = $state<PlaylistDetailed[]>([]);
   let appVersion = $state("1.0.0");
+  let showSettingsModal = $state(false);
 
   let updateStatus = $state<
     "idle" | "checking" | "available" | "downloaded" | "not-available" | "error"
@@ -151,12 +157,29 @@
       }
     }
 
+    let unsubscribeRequest: (() => void) | null = null;
+    if (!isFloatingLyricsWindow) {
+      unsubscribeRequest = onRequestPlayerState(() => {
+        updatePlayerState({
+          isPlaying: player.isPlaying,
+          currentTrack: $state.snapshot(player.currentTrack),
+          currentTime: player.currentTime,
+          duration: player.duration,
+          selectedSource: player.selectedSource,
+          lyricsFontSize: player.lyricsFontSize,
+          lyricsFontSizeExtended: player.lyricsFontSizeExtended,
+          lyricsFontSizeFloating: player.lyricsFontSizeFloating,
+        });
+      });
+    }
+
     loadInitialData();
 
     return () => {
       unsubscribeUpdate();
       window.removeEventListener("resize", handleResize);
       window.removeEventListener("playlists-changed", refreshPlaylists);
+      if (unsubscribeRequest) unsubscribeRequest();
     };
   });
 
@@ -174,7 +197,10 @@
     "/album/:id": AlbumDetail,
     "/artist/:id": ArtistDetail,
     "/search/:query": Search,
+    "/floating-lyrics": FloatingLyrics,
   };
+
+  let isFloatingLyricsWindow = $derived(window.location.hash === "#/floating-lyrics");
 
   let activeSidebar = $derived(player.activeSidebar);
   let queue = $derived(player.queue);
@@ -186,13 +212,33 @@
   let canGoBack = $derived(navigation.canGoBack);
   let canGoForward = $derived(navigation.canGoForward);
   let showAboutModal = $state(false);
+  // Synchronize player state changes to the floating window
+  $effect(() => {
+    if (!isFloatingLyricsWindow) {
+      updatePlayerState({
+        isPlaying: player.isPlaying,
+        currentTrack: $state.snapshot(player.currentTrack),
+        currentTime: player.currentTime,
+        duration: player.duration,
+        selectedSource: player.selectedSource,
+        lyricsFontSize: player.lyricsFontSize,
+        lyricsFontSizeExtended: player.lyricsFontSizeExtended,
+        lyricsFontSizeFloating: player.lyricsFontSizeFloating,
+      });
+    }
+  });
 </script>
 
-<div
-  class="absolute w-screen h-[32px] left-0 top-0"
-  style="app-region: drag;"
-></div>
-<section class="w-screen h-screen overflow-hidden">
+{#if isFloatingLyricsWindow}
+  <main class="w-screen h-screen overflow-hidden bg-transparent select-none">
+    <Router {routes} />
+  </main>
+{:else}
+  <div
+    class="absolute w-screen h-[32px] left-0 top-0"
+    style="app-region: drag;"
+  ></div>
+  <section class="w-screen h-screen overflow-hidden">
   {#if player.showExtended}
     <ExtendedPlayer />
   {:else}
@@ -383,86 +429,13 @@
                   align="start"
                   class="w-56 mt-1.5 bg-background/95 backdrop-blur-xl border border-border/80 rounded-3xl p-1.5 shadow-glass"
                 >
-                  <!-- Lyrics Font Size -->
-                  <DropdownMenu.Sub>
-                    <DropdownMenu.SubTrigger
-                      class="flex items-center gap-2 rounded-2xl px-3 py-2 text-sm font-medium hover:bg-accent/50 cursor-pointer"
-                    >
-                      <CaseSensitiveIcon class="size-4" />
-                      <span>Lyrics Size</span>
-                    </DropdownMenu.SubTrigger>
-                    <DropdownMenu.SubContent
-                      class="bg-background/95 backdrop-blur-xl border border-border/80 rounded-3xl p-1.5 z-50 shadow-glass w-40"
-                    >
-                      <DropdownMenu.Item
-                        onclick={() => player.setLyricsFontSize("small")}
-                        class="flex items-center justify-between rounded-2xl px-3 py-2 text-sm font-medium hover:bg-accent cursor-pointer"
-                      >
-                        <span>Small</span>
-                        {#if player.lyricsFontSize === "small"}
-                          <CheckIcon class="size-4 text-primary" />
-                        {/if}
-                      </DropdownMenu.Item>
-                      <DropdownMenu.Item
-                        onclick={() => player.setLyricsFontSize("medium")}
-                        class="flex items-center justify-between rounded-2xl px-3 py-2 text-sm font-medium hover:bg-accent cursor-pointer"
-                      >
-                        <span>Medium</span>
-                        {#if player.lyricsFontSize === "medium"}
-                          <CheckIcon class="size-4 text-primary" />
-                        {/if}
-                      </DropdownMenu.Item>
-                      <DropdownMenu.Item
-                        onclick={() => player.setLyricsFontSize("large")}
-                        class="flex items-center justify-between rounded-2xl px-3 py-2 text-sm font-medium hover:bg-accent cursor-pointer"
-                      >
-                        <span>Large</span>
-                        {#if player.lyricsFontSize === "large"}
-                          <CheckIcon class="size-4 text-primary" />
-                        {/if}
-                      </DropdownMenu.Item>
-                    </DropdownMenu.SubContent>
-                  </DropdownMenu.Sub>
-
-                  <!-- Playback Speed -->
-                  <DropdownMenu.Sub>
-                    <DropdownMenu.SubTrigger
-                      class="flex items-center gap-2 rounded-2xl px-3 py-2 text-sm font-medium hover:bg-accent/50 cursor-pointer"
-                    >
-                      <GaugeIcon class="size-4" />
-                      <span>Speed</span>
-                    </DropdownMenu.SubTrigger>
-                    <DropdownMenu.SubContent
-                      class="bg-background/95 backdrop-blur-xl border border-border/80 rounded-3xl p-1.5 z-50 shadow-glass w-40"
-                    >
-                      {#each [0.75, 1.0, 1.25, 1.5, 2.0] as rate}
-                        <DropdownMenu.Item
-                          onclick={() => player.setPlaybackRate(rate)}
-                          class="flex items-center justify-between rounded-2xl px-3 py-2 text-sm font-medium hover:bg-accent cursor-pointer"
-                        >
-                          <span
-                            >{rate === 1.0 ? "Normal (1.0x)" : `${rate}x`}</span
-                          >
-                          {#if player.playbackRate === rate}
-                            <CheckIcon class="size-4 text-primary" />
-                          {/if}
-                        </DropdownMenu.Item>
-                      {/each}
-                    </DropdownMenu.SubContent>
-                  </DropdownMenu.Sub>
-
-                  <!-- Discord Presence -->
+                  <!-- Settings -->
                   <DropdownMenu.Item
-                    onclick={() => player.toggleDiscordPresence()}
-                    class="flex items-center justify-between rounded-2xl px-3 py-2 text-sm font-medium hover:bg-accent cursor-pointer"
+                    onclick={() => (showSettingsModal = true)}
+                    class="flex items-center gap-2 rounded-2xl px-3 py-2 text-sm font-medium hover:bg-accent cursor-pointer"
                   >
-                    <div class="flex items-center gap-2">
-                      <Gamepad2Icon class="size-4" />
-                      <span>Discord Presence</span>
-                    </div>
-                    {#if player.discordPresenceEnabled}
-                      <CheckIcon class="size-4 text-primary" />
-                    {/if}
+                    <SettingsIcon class="size-4" />
+                    <span>Settings</span>
                   </DropdownMenu.Item>
 
                   <DropdownMenu.Separator
@@ -753,5 +726,8 @@
     </Dialog.Content>
   </Dialog.Root>
 
-  <Glow />
-</section>
+  <SettingsDialog bind:open={showSettingsModal} />
+
+    <Glow />
+  </section>
+{/if}

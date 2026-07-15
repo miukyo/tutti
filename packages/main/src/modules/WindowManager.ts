@@ -8,6 +8,7 @@ class WindowManager implements AppModule {
   readonly #preload: { path: string };
   readonly #renderer: { path: string } | URL;
   readonly #openDevTools;
+  #mainWindow: BrowserWindow | null = null;
 
   constructor({ initConfig, openDevTools = false }: { initConfig: AppInitConfig, openDevTools?: boolean }) {
     this.#preload = initConfig.preload;
@@ -55,6 +56,7 @@ class WindowManager implements AppModule {
       titleBarStyle: 'hidden',
       ...(process.platform !== 'darwin' ? {
         titleBarOverlay: {
+          height: 8,
           color: "#00000000",
           symbolColor: "white"
         }
@@ -75,6 +77,11 @@ class WindowManager implements AppModule {
       await browserWindow.loadFile(this.#renderer.path);
     }
 
+    browserWindow.on('closed', () => {
+      this.#mainWindow = null;
+    });
+
+    this.#mainWindow = browserWindow;
     return browserWindow;
   }
 
@@ -84,6 +91,8 @@ class WindowManager implements AppModule {
     if (window === undefined) {
       window = await this.createWindow();
     }
+
+    this.#mainWindow = window;
 
     if (!show) {
       return window;
@@ -101,10 +110,8 @@ class WindowManager implements AppModule {
 
     window.focus();
 
-
     return window;
   }
-
 }
 
 export function createWindowManagerModule(...args: ConstructorParameters<typeof WindowManager>) {

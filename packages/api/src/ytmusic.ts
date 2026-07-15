@@ -726,7 +726,7 @@ export class YTMusic {
     if (!/^[a-zA-Z0-9-_]{11}$/.test(videoId)) {
       throw new Error('Invalid videoId: must be 11 characters.');
     }
-    const data = await this.constructPlayerRequest(videoId);
+    const data = await this.constructPlayerRequest(videoId, true);
     const song = songParser.parse(data);
     if (song.videoId !== videoId) {
       throw new Error('Invalid videoId returned from server');
@@ -894,6 +894,8 @@ export class YTMusic {
               const lines = parseLyricsPlus(json);
               if (lines && lines.length > 0) {
                 const sourceLabel = json.metadata?.source || json.metadata?.provider || 'LyricsPlus';
+                // Deezer search result is inaccurate
+                if (sourceLabel === "Deezer") return null;
                 const isUnsynced = lines.every((line) => !line.startTimeMs && !line.endTimeMs);
                 return { synced: !isUnsynced, lines, source: sourceLabel };
               }

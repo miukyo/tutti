@@ -1,10 +1,26 @@
 <script lang="ts">
-  import { ytmusic } from "@app/preload";
+  import {
+    ytmusic,
+    toggleFloatingLyrics,
+    isFloatingLyricsOpen,
+    onFloatingLyricsStatus,
+    toggleFloatingLyricsLock,
+    isFloatingLyricsLocked,
+    onFloatingLyricsLockStatus,
+  } from "@app/preload";
   import { player } from "$lib/stores/player.svelte";
   import { Spinner } from "$lib/components/ui/spinner";
   import type { LyricResult, LyricLine } from "@app/api/src/types";
-  import { Music2Icon, Music3Icon } from "@lucide/svelte";
+  import {
+    Music2Icon,
+    Music3Icon,
+    PictureInPicture2Icon,
+    LockIcon,
+    UnlockIcon,
+  } from "@lucide/svelte";
   import { GoogleService } from "../google-tl";
+  import { onMount } from "svelte";
+  import { Button } from "$lib/components/ui/button";
 
   let lyricsResult = $state<LyricResult | null>(null);
   let loading = $state(false);
@@ -18,7 +34,12 @@
   let {
     showInfo = false,
     isExtended = false,
-  }: { showInfo?: boolean; isExtended?: boolean } = $props();
+    isFloating = false,
+  }: {
+    showInfo?: boolean;
+    isExtended?: boolean;
+    isFloating?: boolean;
+  } = $props();
 
   // React to track and source changes
   $effect(() => {
@@ -29,7 +50,7 @@
         track.videoId,
         track.name,
         track.artists.map((a) => a.name).join(" & "),
-        track.duration,
+        track.duration || player.duration,
         source,
       );
     } else {
@@ -241,16 +262,21 @@
   let rafId: number;
 
   function updateInterpolatedTime() {
-    if (player.isPlaying && player.audio && !player.audio.paused) {
+    if (player.isPlaying) {
       const now = performance.now();
+      if (lastUpdateTime === 0) {
+        lastUpdateTime = now;
+      }
       const elapsed = (now - lastUpdateTime) / 1000;
       let targetTime = lastAudioTime + elapsed;
-      const actualTime = player.audio.currentTime;
 
-      if (Math.abs(targetTime - actualTime) > 0.5) {
-        targetTime = actualTime;
-        lastAudioTime = actualTime;
-        lastUpdateTime = now;
+      if (player.audio && !player.audio.paused) {
+        const actualTime = player.audio.currentTime;
+        if (Math.abs(targetTime - actualTime) > 0.5) {
+          targetTime = actualTime;
+          lastAudioTime = actualTime;
+          lastUpdateTime = now;
+        }
       }
       interpolatedTime = targetTime;
     } else {
@@ -386,24 +412,26 @@
     };
   });
 
+  let scrollRatio = $derived(isFloating ? 0.3 : 0.45);
+
   let activeLineOffset = $derived.by(() => {
     if (stableTargetIndex === -1 || !containerEl || !linesContainerEl) {
-      return containerHeight * 0.45;
+      return containerHeight * scrollRatio;
     }
     const activeEl = linesContainerEl.querySelector(
       `[data-index="${stableTargetIndex}"]`,
     ) as HTMLElement;
-    if (!activeEl) return containerHeight * 0.45;
+    if (!activeEl) return containerHeight * scrollRatio;
 
     const activeOffsetTop = activeEl.offsetTop;
     const activeHeight = activeEl.clientHeight;
-    return containerHeight * 0.45 - activeOffsetTop - activeHeight / 2;
+    return containerHeight * scrollRatio - activeOffsetTop - activeHeight / 2;
   });
 
   let translateY = $derived.by(() => {
     const rawY = activeLineOffset + userScrollOffset;
-    const minY = containerHeight * 0.45 - contentHeight;
-    const maxY = containerHeight * 0.45;
+    const minY = containerHeight * scrollRatio - contentHeight;
+    const maxY = containerHeight * scrollRatio;
     if (contentHeight > containerHeight) {
       return Math.max(minY, Math.min(maxY, rawY));
     }
@@ -414,8 +442,8 @@
     event.preventDefault();
     isUserScrolling = true;
 
-    const minY = containerHeight * 0.45 - contentHeight;
-    const maxY = containerHeight * 0.45;
+    const minY = containerHeight * scrollRatio - contentHeight;
+    const maxY = containerHeight * scrollRatio;
 
     let targetOffset = userScrollOffset - event.deltaY;
     const rawY = activeLineOffset + targetOffset;
@@ -459,8 +487,8 @@
     }
 
     if (isDragging) {
-      const minY = containerHeight * 0.45 - contentHeight;
-      const maxY = containerHeight * 0.45;
+      const minY = containerHeight * scrollRatio - contentHeight;
+      const maxY = containerHeight * scrollRatio;
 
       let targetOffset = startScrollOffset + deltaY;
       const rawY = activeLineOffset + targetOffset;
@@ -505,12 +533,88 @@
     const duration = word.durationMs || 300;
     return elapsed >= duration ? 1 : elapsed / duration;
   }
+
+  let isFloatingOpen = $state(false);
+  let isFloatingLocked = $state(false);
+
+  onMount(() => {
+    isFloatingLyricsOpen().then((open) => {
+      isFloatingOpen = open;
+    });
+
+    isFloatingLyricsLocked().then((locked) => {
+      isFloatingLocked = locked;
+    });
+
+    const unsubscribeStatus = onFloatingLyricsStatus((open) => {
+      isFloatingOpen = open;
+    });
+
+    const unsubscribeLockStatus = onFloatingLyricsLockStatus((locked) => {
+      isFloatingLocked = locked;
+    });
+
+    return () => {
+      unsubscribeStatus();
+      unsubscribeLockStatus();
+    };
+  });
+
+  async function handleToggleFloating() {
+    isFloatingOpen = await toggleFloatingLyrics();
+  }
+
+  async function handleToggleLock() {
+    isFloatingLocked = await toggleFloatingLyricsLock();
+  }
+  const currentLyricsSize = $derived(
+    isFloating
+      ? player.lyricsFontSizeFloating
+      : isExtended
+        ? player.lyricsFontSizeExtended
+        : player.lyricsFontSize
+  );
 </script>
 
 <div
-  class="flex flex-col h-full w-full select-none overflow-hidden"
+  class="flex flex-col h-full w-full select-none overflow-hidden relative"
   bind:clientHeight={containerHeight}
 >
+  {#if lyricsResult && lyricsResult.synced && !loading && !isFloating}
+    <div
+      class="absolute top-4 right-4 z-50 flex gap-2"
+      style="app-region: no-drag;"
+    >
+      {#if isFloatingOpen}
+        <Button
+          variant="outline-blur"
+          size="icon"
+          onclick={handleToggleLock}
+          class="rounded-full size-9 text-muted-foreground hover:text-foreground shadow-glass"
+          title={isFloatingLocked
+            ? "Unlock Desktop Lyrics Position"
+            : "Lock Desktop Lyrics Position"}
+        >
+          {#if isFloatingLocked}
+            <LockIcon class="size-4.5" />
+          {:else}
+            <UnlockIcon class="size-4.5" />
+          {/if}
+        </Button>
+      {/if}
+      <Button
+        variant="outline-blur"
+        size="icon"
+        onclick={handleToggleFloating}
+        class="rounded-full size-9 shadow-glass {isFloatingOpen
+          ? 'text-primary'
+          : 'text-muted-foreground hover:text-foreground'}"
+        title={isFloatingOpen ? "Close Desktop Lyrics" : "Open Desktop Lyrics"}
+      >
+        <PictureInPicture2Icon class="size-4.5" />
+      </Button>
+    </div>
+  {/if}
   {#if loading}
     <div class="flex flex-col items-center justify-center flex-1 gap-3">
       <Spinner />
@@ -539,16 +643,15 @@
       class="flex-1 px-6 relative {lyricsResult.synced
         ? 'overflow-hidden cursor-grab active:cursor-grabbing'
         : 'overflow-y-auto scrollbar-none py-12'}"
-      style="--lyric-font-size: {player.lyricsFontSize === 'small'
-        ? '1.2rem'
-        : player.lyricsFontSize === 'large'
-          ? '1.8rem'
-          : '1.5rem'};"
+      style="--lyric-font-size: {1.5 * currentLyricsSize}rem;
+             --lyric-size-multiplier: {currentLyricsSize};"
     >
       <div
         bind:this={linesContainerEl}
         bind:clientHeight={contentHeight}
-        class="flex flex-col gap-6 w-full select-none"
+        class="flex flex-col w-full select-none {isFloating
+          ? 'gap-4'
+          : 'gap-6'}"
       >
         {#each lyricsResult.lines as line, index}
           {@const isActive = activeIndicesStr
@@ -584,6 +687,7 @@
                 class="lyric-line {isActive ? 'active' : isPast ? 'past' : ''}"
                 class:is-background={line.isBackground}
                 class:is-extended={isExtended}
+                class:is-floating={isFloating}
                 style="--distance: {distance};"
               >
                 <div class="main-line flex flex-wrap">
@@ -599,7 +703,7 @@
                       wIndex > 0 &&
                       word.isBackground !== line.words[wIndex - 1].isBackground}
                     {#if isTransition}
-                      <div class="w-full h-2"></div>
+                      <div class="w-full {isFloating ? 'h-0.5' : 'h-2'}"></div>
                     {/if}
                     <span
                       class="word-wrapper {isWordPast
@@ -621,7 +725,9 @@
                 </div>
                 {#if line.romanizedText}
                   <span
-                    class="romanized-line text-[0.6em] font-bold leading-normal mt-1 select-none transition-opacity"
+                    class="romanized-line text-[0.6em] font-bold leading-normal {isFloating
+                      ? 'mt-0.5'
+                      : 'mt-1'} select-none transition-opacity"
                   >
                     {line.romanizedText}
                   </span>
@@ -635,12 +741,17 @@
                 class:is-background={line.isBackground}
                 class:is-instrumental={line.isInstrumental}
                 class:is-extended={isExtended}
+                class:is-floating={isFloating}
                 style="--distance: {distance};"
               >
                 {#if line.isInstrumental}
                   <Music2Icon
                     strokeWidth={4}
-                    class={isExtended ? "size-[2vw]" : ""}
+                    class={isExtended
+                      ? "size-[2vw]"
+                      : isFloating
+                        ? "size-[4.5vw]"
+                        : ""}
                   />
                 {:else}
                   <div class="main-line">
@@ -648,7 +759,9 @@
                   </div>
                   {#if line.romanizedText}
                     <span
-                      class="romanized-line text-[0.6em] font-bold leading-normal mt-1 select-none transition-opacity"
+                      class="romanized-line text-[0.6em] font-bold leading-normal {isFloating
+                        ? 'mt-0.5'
+                        : 'mt-1'} select-none transition-opacity"
                     >
                       {line.romanizedText}
                     </span>
@@ -732,7 +845,7 @@
     transform: scale(0.95) translateX(calc(var(--distance, 0) * -10px + 3rem));
     margin-left: 50%;
     width: 45%;
-    font-size: 2.5vw;
+    font-size: calc(2.5vw * var(--lyric-size-multiplier, 1.0));
     transition:
       transform 1.5s ease,
       opacity 0.4s ease,
@@ -788,7 +901,7 @@
   }
 
   .lyric-line.is-extended.is-background {
-    font-size: 2vw;
+    font-size: calc(2vw * var(--lyric-size-multiplier, 1.0));
   }
 
   .lyric-line.is-background.active {
@@ -801,7 +914,7 @@
   }
 
   .lyric-line.is-extended .word-wrapper.is-background {
-    font-size: 2vw;
+    font-size: calc(2vw * var(--lyric-size-multiplier, 1.0));
   }
 
   .lyric-line.is-instrumental {
@@ -826,5 +939,22 @@
 
   .lyric-line.past .romanized-line {
     opacity: max(0.15, var(--opacity-amount) * 0.8);
+  }
+
+  .lyric-line.is-floating {
+    transform-origin: center center;
+    align-items: center;
+    align-content: center;
+    text-align: center;
+    font-size: calc(5vw * var(--lyric-size-multiplier, 1.0));
+  }
+
+  .lyric-line.is-floating .word-wrapper.is-background {
+    font-size: calc(4.5vw * var(--lyric-size-multiplier, 1.0));
+  }
+
+  .lyric-line.is-floating .main-line {
+    justify-content: center;
+    text-align: center;
   }
 </style>
