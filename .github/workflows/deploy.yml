@@ -40,3 +40,38 @@ jobs:
       - run: gh release create v${{inputs.app-version}} $(find dist -maxdepth 1 -type f) --repo ${{github.repository}}
         env:
           GH_TOKEN: ${{ github.token }}
+
+      - name: Install Butler
+        uses: josephbanzida/itch-setup-butler@v1.2.2
+
+      - name: Deploy to Itch.io
+        env:
+          BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
+          ITCH_USERNAME: ${{ secrets.ITCH_USERNAME }}
+          ITCH_GAME: ${{ secrets.ITCH_GAME }}
+        run: |
+          if [ -z "$BUTLER_API_KEY" ]; then
+            echo "WARNING: BUTLER_API_KEY secret is not set. Skipping Itch.io deployment."
+            exit 0
+          fi
+
+          # Find the compiled installers/packages
+          WINDOWS_FILE=$(find dist -name "*.exe" -maxdepth 1 | head -n 1)
+          MAC_FILE=$(find dist -name "*.dmg" -maxdepth 1 | head -n 1)
+          LINUX_FILE=$(find dist -name "*.deb" -maxdepth 1 | head -n 1)
+
+          if [ -n "$WINDOWS_FILE" ]; then
+            echo "Pushing $WINDOWS_FILE to itch.io..."
+            butler push "$WINDOWS_FILE" "$ITCH_USERNAME/$ITCH_GAME:windows" --userversion "${{inputs.app-version}}"
+          fi
+
+          if [ -n "$MAC_FILE" ]; then
+            echo "Pushing $MAC_FILE to itch.io..."
+            butler push "$MAC_FILE" "$ITCH_USERNAME/$ITCH_GAME:osx" --userversion "${{inputs.app-version}}"
+          fi
+
+          if [ -n "$LINUX_FILE" ]; then
+            echo "Pushing $LINUX_FILE to itch.io..."
+            butler push "$LINUX_FILE" "$ITCH_USERNAME/$ITCH_GAME:linux" --userversion "${{inputs.app-version}}"
+          fi
+
