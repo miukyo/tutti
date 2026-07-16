@@ -81,12 +81,13 @@ class WindowManager implements AppModule {
       this.#mainWindow = null;
     });
 
+    (browserWindow as any).isMainWindow = true;
     this.#mainWindow = browserWindow;
     return browserWindow;
   }
 
   async restoreOrCreateWindow(show = false) {
-    let window = BrowserWindow.getAllWindows().find(w => !w.isDestroyed());
+    let window = this.#mainWindow && !this.#mainWindow.isDestroyed() ? this.#mainWindow : undefined;
 
     if (window === undefined) {
       window = await this.createWindow();

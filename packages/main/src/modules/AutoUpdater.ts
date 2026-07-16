@@ -72,7 +72,7 @@ export class AutoUpdater implements AppModule {
     });
 
     updater.on('update-downloaded', (info) => {
-      const window = BrowserWindow.getAllWindows().find(w => !w.isDestroyed());
+      const window = BrowserWindow.getAllWindows().find(w => !w.isDestroyed() && (w as any).isMainWindow);
       if (window) {
         window.webContents.send('update-downloaded', info);
       }

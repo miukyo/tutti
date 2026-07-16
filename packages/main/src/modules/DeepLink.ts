@@ -22,7 +22,7 @@ if (initialUrl) {
 }
 
 function sendOrQueueUrl(url: string) {
-  const win = BrowserWindow.getAllWindows().find(w => !w.isDestroyed());
+  const win = BrowserWindow.getAllWindows().find(w => !w.isDestroyed() && (w as any).isMainWindow);
   if (win && win.webContents && !win.webContents.isLoading()) {
     win.webContents.send('deep-link', url);
   } else {

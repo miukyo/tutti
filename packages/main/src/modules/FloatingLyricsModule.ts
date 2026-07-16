@@ -71,7 +71,7 @@ class FloatingLyricsManager implements AppModule {
     });
 
     ipcMain.on('request-player-state', (event) => {
-      const mainWindow = BrowserWindow.getAllWindows().find(w => w !== this.#floatingLyricsWindow && !w.isDestroyed());
+      const mainWindow = BrowserWindow.getAllWindows().find(w => (w as any).isMainWindow && !w.isDestroyed());
       if (mainWindow) {
         mainWindow.webContents.send('request-player-state');
       }
@@ -85,7 +85,7 @@ class FloatingLyricsManager implements AppModule {
         this.#floatingLyricsWindow.webContents.send('floating-lyrics-lock-status', this.#isFloatingLyricsLocked);
       }
 
-      const mainWindow = BrowserWindow.getAllWindows().find(w => w !== this.#floatingLyricsWindow && !w.isDestroyed());
+      const mainWindow = BrowserWindow.getAllWindows().find(w => (w as any).isMainWindow && !w.isDestroyed());
       mainWindow?.webContents.send('floating-lyrics-lock-status', this.#isFloatingLyricsLocked);
       return this.#isFloatingLyricsLocked;
     });
@@ -183,16 +183,27 @@ class FloatingLyricsManager implements AppModule {
       this.#floatingLyricsWindow?.webContents.send('floating-lyrics-lock-status', this.#isFloatingLyricsLocked);
     });
 
+    const mainWindow = BrowserWindow.getAllWindows().find(w => (w as any).isMainWindow && !w.isDestroyed());
+    const handleMainWindowClosed = () => {
+      this.closeFloatingLyrics();
+    };
+    if (mainWindow) {
+      mainWindow.once('closed', handleMainWindowClosed);
+    }
+
     this.#floatingLyricsWindow.on('closed', () => {
       if (saveTimeout) clearTimeout(saveTimeout);
       this.#floatingLyricsWindow = null;
 
-      const mainWindow = BrowserWindow.getAllWindows().find(w => w !== this.#floatingLyricsWindow && !w.isDestroyed());
-      mainWindow?.webContents.send('floating-lyrics-status', false);
-      mainWindow?.webContents.send('floating-lyrics-lock-status', false);
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.off('closed', handleMainWindowClosed);
+      }
+
+      const currentMainWindow = BrowserWindow.getAllWindows().find(w => (w as any).isMainWindow && !w.isDestroyed());
+      currentMainWindow?.webContents.send('floating-lyrics-status', false);
+      currentMainWindow?.webContents.send('floating-lyrics-lock-status', false);
     });
 
-    const mainWindow = BrowserWindow.getAllWindows().find(w => w !== this.#floatingLyricsWindow && !w.isDestroyed());
     mainWindow?.webContents.send('floating-lyrics-status', true);
     mainWindow?.webContents.send('floating-lyrics-lock-status', this.#isFloatingLyricsLocked);
   }
