@@ -41,37 +41,44 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
 
-      - name: Install Butler
-        uses: josephbanzida/itch-setup-butler@v1.2.2
-
-      - name: Deploy to Itch.io
-        env:
-          BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
-          ITCH_USERNAME: ${{ secrets.ITCH_USERNAME }}
-          ITCH_GAME: ${{ secrets.ITCH_GAME }}
+      - name: Locate Build Files
+        id: locate-files
         run: |
-          if [ -z "$BUTLER_API_KEY" ]; then
-            echo "WARNING: BUTLER_API_KEY secret is not set. Skipping Itch.io deployment."
-            exit 0
-          fi
+          echo "windows_file=$(find dist -name "*.exe" -maxdepth 1 | head -n 1)" >> $GITHUB_OUTPUT
+          echo "mac_file=$(find dist -name "*.dmg" -maxdepth 1 | head -n 1)" >> $GITHUB_OUTPUT
+          echo "linux_file=$(find dist -name "*.deb" -maxdepth 1 | head -n 1)" >> $GITHUB_OUTPUT
 
-          # Find the compiled installers/packages
-          WINDOWS_FILE=$(find dist -name "*.exe" -maxdepth 1 | head -n 1)
-          MAC_FILE=$(find dist -name "*.dmg" -maxdepth 1 | head -n 1)
-          LINUX_FILE=$(find dist -name "*.deb" -maxdepth 1 | head -n 1)
+      - name: Deploy Windows to Itch.io
+        if: ${{ steps.locate-files.outputs.windows_file != '' && secrets.BUTLER_CREDENTIALS != '' }}
+        uses: yeslayla/butler-publish-itchio-action@master
+        env:
+          BUTLER_CREDENTIALS: ${{ secrets.BUTLER_CREDENTIALS }}
+          CHANNEL: windows
+          ITCH_GAME: ${{ secrets.ITCH_GAME }}
+          ITCH_USER: ${{ secrets.ITCH_USERNAME }}
+          PACKAGE: ${{ steps.locate-files.outputs.windows_file }}
+          VERSION: ${{ inputs.app-version }}
 
-          if [ -n "$WINDOWS_FILE" ]; then
-            echo "Pushing $WINDOWS_FILE to itch.io..."
-            butler push "$WINDOWS_FILE" "$ITCH_USERNAME/$ITCH_GAME:windows" --userversion "${{inputs.app-version}}"
-          fi
+      - name: Deploy macOS to Itch.io
+        if: ${{ steps.locate-files.outputs.mac_file != '' && secrets.BUTLER_CREDENTIALS != '' }}
+        uses: yeslayla/butler-publish-itchio-action@master
+        env:
+          BUTLER_CREDENTIALS: ${{ secrets.BUTLER_CREDENTIALS }}
+          CHANNEL: osx
+          ITCH_GAME: ${{ secrets.ITCH_GAME }}
+          ITCH_USER: ${{ secrets.ITCH_USERNAME }}
+          PACKAGE: ${{ steps.locate-files.outputs.mac_file }}
+          VERSION: ${{ inputs.app-version }}
 
-          if [ -n "$MAC_FILE" ]; then
-            echo "Pushing $MAC_FILE to itch.io..."
-            butler push "$MAC_FILE" "$ITCH_USERNAME/$ITCH_GAME:osx" --userversion "${{inputs.app-version}}"
-          fi
+      - name: Deploy Linux to Itch.io
+        if: ${{ steps.locate-files.outputs.linux_file != '' && secrets.BUTLER_CREDENTIALS != '' }}
+        uses: yeslayla/butler-publish-itchio-action@master
+        env:
+          BUTLER_CREDENTIALS: ${{ secrets.BUTLER_CREDENTIALS }}
+          CHANNEL: linux
+          ITCH_GAME: ${{ secrets.ITCH_GAME }}
+          ITCH_USER: ${{ secrets.ITCH_USERNAME }}
+          PACKAGE: ${{ steps.locate-files.outputs.linux_file }}
+          VERSION: ${{ inputs.app-version }}
 
-          if [ -n "$LINUX_FILE" ]; then
-            echo "Pushing $LINUX_FILE to itch.io..."
-            butler push "$LINUX_FILE" "$ITCH_USERNAME/$ITCH_GAME:linux" --userversion "${{inputs.app-version}}"
-          fi
 
