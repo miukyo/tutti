@@ -43,16 +43,26 @@ jobs:
 
       - name: Locate Build Files
         id: locate-files
+        env:
+          BUTLER_CREDENTIALS: ${{ secrets.BUTLER_CREDENTIALS }}
+          ITCH_GAME: ${{ secrets.ITCH_GAME }}
+          ITCH_USERNAME: ${{ secrets.ITCH_USERNAME }}
         run: |
           echo "windows_file=$(find dist -name "*.exe" -maxdepth 1 | head -n 1)" >> $GITHUB_OUTPUT
           echo "mac_file=$(find dist -name "*.dmg" -maxdepth 1 | head -n 1)" >> $GITHUB_OUTPUT
           echo "linux_file=$(find dist -name "*.deb" -maxdepth 1 | head -n 1)" >> $GITHUB_OUTPUT
 
+          if [ -n "$BUTLER_CREDENTIALS" ] && [ -n "$ITCH_GAME" ] && [ -n "$ITCH_USERNAME" ]; then
+            echo "has_credentials=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_credentials=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Deploy Windows to Itch.io
-        if: ${{ steps.locate-files.outputs.windows_file != '' && secrets.BUTLER_API_KEY != '' }}
+        if: ${{ steps.locate-files.outputs.windows_file != '' && steps.locate-files.outputs.has_credentials == 'true' }}
         uses: yeslayla/butler-publish-itchio-action@master
         env:
-          BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
+          BUTLER_CREDENTIALS: ${{ secrets.BUTLER_CREDENTIALS }}
           CHANNEL: windows
           ITCH_GAME: ${{ secrets.ITCH_GAME }}
           ITCH_USER: ${{ secrets.ITCH_USERNAME }}
@@ -60,10 +70,10 @@ jobs:
           VERSION: ${{ inputs.app-version }}
 
       - name: Deploy macOS to Itch.io
-        if: ${{ steps.locate-files.outputs.mac_file != '' && secrets.BUTLER_API_KEY != '' }}
+        if: ${{ steps.locate-files.outputs.mac_file != '' && steps.locate-files.outputs.has_credentials == 'true' }}
         uses: yeslayla/butler-publish-itchio-action@master
         env:
-          BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
+          BUTLER_CREDENTIALS: ${{ secrets.BUTLER_CREDENTIALS }}
           CHANNEL: osx
           ITCH_GAME: ${{ secrets.ITCH_GAME }}
           ITCH_USER: ${{ secrets.ITCH_USERNAME }}
@@ -71,10 +81,10 @@ jobs:
           VERSION: ${{ inputs.app-version }}
 
       - name: Deploy Linux to Itch.io
-        if: ${{ steps.locate-files.outputs.linux_file != '' && secrets.BUTLER_API_KEY != '' }}
+        if: ${{ steps.locate-files.outputs.linux_file != '' && steps.locate-files.outputs.has_credentials == 'true' }}
         uses: yeslayla/butler-publish-itchio-action@master
         env:
-          BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
+          BUTLER_CREDENTIALS: ${{ secrets.BUTLER_CREDENTIALS }}
           CHANNEL: linux
           ITCH_GAME: ${{ secrets.ITCH_GAME }}
           ITCH_USER: ${{ secrets.ITCH_USERNAME }}
