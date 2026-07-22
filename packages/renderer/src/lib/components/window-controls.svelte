@@ -1,11 +1,11 @@
 <script lang="ts">
-  import { 
-    minimizeWindow, 
-    maximizeWindow, 
-    closeWindow, 
-    isWindowMaximized, 
-    onMaximizedStatus, 
-    platform 
+  import {
+    minimizeWindow,
+    maximizeWindow,
+    closeWindow,
+    isWindowMaximized,
+    onMaximizedStatus,
+    platform,
   } from "@app/preload";
   import { Button } from "$lib/components/ui/button";
   import * as ButtonGroup from "$lib/components/ui/button-group";
@@ -33,12 +33,12 @@
 </script>
 
 {#if showControls}
-  <div 
-    class="absolute top-[clamp(0.5rem,1vw,1rem)] right-[clamp(0.5rem,1vw,1rem)] z-500 flex items-center select-none" 
+  <div
+    class="flex items-center select-none"
     style="app-region: no-drag;"
   >
     <ButtonGroup.Root
-      class="rounded-full bg-background/50 backdrop-blur-md border border-border h-[clamp(2.2rem,2.5vw,2.6rem)] items-center flex px-2 gap-1.5 shadow-glass hover:shadow-glass-hover transition-all duration-300 overflow-hidden"
+      class="rounded-full bg-background/50 backdrop-blur-sm border border-border h-10 items-center flex px-2 gap-1 shadow-glass hover:shadow-glass-hover transition-shadow overflow-hidden"
       data-glow
     >
       <!-- Minimize Button -->
@@ -47,10 +47,10 @@
         size="icon-sm"
         active-scale="child"
         onclick={minimizeWindow}
-        class="text-muted-foreground hover:text-primary transition-colors flex items-center justify-center p-0 w-[clamp(1.6rem,2vw,1.8rem)] h-[clamp(1.6rem,2vw,1.8rem)] rounded-full hover:bg-foreground/5"
+        class="text-muted-foreground hover:text-primary transition-colors flex items-center justify-center p-0 size-8 rounded-full hover:bg-foreground/5"
         title="Minimize"
       >
-        <MinusIcon class="size-[clamp(0.9rem,1.1vw,1.1rem)]" />
+        <MinusIcon class="size-5" />
       </Button>
 
       <div class="w-[1px] h-3 my-auto bg-border/40"></div>
@@ -61,13 +61,13 @@
         size="icon-sm"
         active-scale="child"
         onclick={maximizeWindow}
-        class="text-muted-foreground hover:text-primary transition-colors flex items-center justify-center p-0 w-[clamp(1.6rem,2vw,1.8rem)] h-[clamp(1.6rem,2vw,1.8rem)] rounded-full hover:bg-foreground/5"
+        class="text-muted-foreground hover:text-primary transition-colors flex items-center justify-center p-0 size-8 rounded-full hover:bg-foreground/5"
         title={isMaximized ? "Restore" : "Maximize"}
       >
         {#if isMaximized}
-          <CopyIcon class="size-[clamp(0.8rem,0.95vw,0.95rem)]" />
+          <CopyIcon class="size-5" />
         {:else}
-          <SquareIcon class="size-[clamp(0.8rem,0.95vw,0.95rem)]" />
+          <SquareIcon class="size-5" />
         {/if}
       </Button>
 
@@ -79,10 +79,10 @@
         size="icon-sm"
         active-scale="child"
         onclick={closeWindow}
-        class="text-muted-foreground hover:text-destructive transition-colors flex items-center justify-center p-0 w-[clamp(1.6rem,2vw,1.8rem)] h-[clamp(1.6rem,2vw,1.8rem)] rounded-full hover:bg-destructive/10"
+        class="text-muted-foreground hover:text-destructive transition-colors flex items-center justify-center p-0 size-8 rounded-full hover:bg-destructive/10"
         title="Close"
       >
-        <XIcon class="size-[clamp(0.9rem,1.1vw,1.1rem)]" />
+        <XIcon class="size-5" />
       </Button>
     </ButtonGroup.Root>
   </div>

@@ -413,7 +413,7 @@
         <div
           class="relative overflow-hidden bg-card/50 size-full rounded-[1.6rem] border border-border"
         >
-          <div class="absolute flex justify-between p-2 z-100 w-full">
+          <div class="absolute flex justify-between p-2 z-10 w-full">
             <div class="flex gap-1 items-center">
               <DropdownMenu.Root>
                 <DropdownMenu.Trigger>
@@ -493,7 +493,7 @@
                 >
               </ButtonGroup.Root>
             </div>
-            <div>
+            <div class="flex items-center gap-4">
               <ButtonGroup.Root
                 class="rounded-full bg-background/50 backdrop-blur-sm  border border-border h-10 items-center flex px-2 shadow-glass hover:shadow-glass-hover transition-shadow overflow-hidden"
                 style="app-region: no-drag;"
@@ -550,7 +550,7 @@
                       player.activeSidebar === "lyrics" ? "none" : "lyrics")}
                   class={player.activeSidebar === "lyrics"
                     ? "text-primary"
-                    : ""}><MicVocalIcon /></Button
+                    : ""}><MicVocalIcon class="size-5" /></Button
                 >
                 <!-- <div class="w-[2px] h-4 my-auto bg-border"></div> -->
                 <Button
@@ -561,9 +561,12 @@
                     (player.activeSidebar =
                       player.activeSidebar === "queue" ? "none" : "queue")}
                   class={player.activeSidebar === "queue" ? "text-primary" : ""}
-                  ><ListIcon /></Button
+                  ><ListIcon class="size-5" /></Button
                 >
               </ButtonGroup.Root>
+              {#if activeSidebar === "none"}
+                <WindowControls />
+              {/if}
             </div>
           </div>
 
@@ -575,20 +578,23 @@
       {#if activeSidebar !== "none"}
         <Resizable.Handle />
         <Resizable.Pane id="right" minSize={20} defaultSize={20} maxSize={30}>
-          <div class="size-full overflow-hidden relative">
+          <div class="size-full overflow-hidden relative flex flex-col pt-12">
+            <!-- Window controls positioned absolutely at the top right of the right sidebar -->
+            <div class="absolute right-2 top-2 z-20 flex items-center select-none" style="app-region: no-drag;">
+              <WindowControls />
+            </div>
+
             {#if activeSidebar === "queue"}
-              <div class="absolute left-2 right-2 flex items-center justify-between z-10 select-none" style="top: clamp(0.5rem, 1vw, 1rem); height: clamp(2.2rem, 2.5vw, 2.6rem);">
+              <div class="h-12 flex items-center px-4 select-none">
                 <h2 class="text-lg font-bold text-foreground">Queue</h2>
-                <div class="w-[clamp(6.5rem,8vw,7.5rem)]"></div>
               </div>
               <div
-                class="w-full h-12 absolute top-0 bg-linear-to-b from-background to-transparent z-5 pointer-events-none"
+                class="w-full h-12 absolute top-12 bg-linear-to-b from-background to-transparent z-5 pointer-events-none"
               ></div>
               <div
                 class="w-full h-12 absolute bottom-0 bg-linear-to-t from-background to-transparent z-5 pointer-events-none"
               ></div>
               <ScrollArea class="flex-1 min-h-0 pr-2 h-full">
-                <div class="h-16"></div>
                 {#if queue.length > 0}
                   <SongTable
                     songs={queue}
@@ -603,10 +609,10 @@
                 <div class="h-12"></div>
               </ScrollArea>
             {:else if activeSidebar === "lyrics"}
-              <div class="absolute left-2 right-2 flex items-center justify-between z-10" style="top: clamp(0.5rem, 1vw, 1rem); height: clamp(2.2rem, 2.5vw, 2.6rem);">
+              <div class="h-12 flex items-center px-4 select-none">
                 <Select.Root type="single" bind:value={player.selectedSource}>
                   <Select.Trigger
-                    class="w-[150px] shadow-glass bg-background/50 border border-border backdrop-blur-md rounded-full focus-visible:ring-0 overflow-hidden"
+                    class="w-[180px] shadow-glass bg-background/50 border border-border backdrop-blur-md rounded-full focus-visible:ring-0 overflow-hidden"
                     data-glow
                   >
                     {player.selectedSource === "Auto"
@@ -615,7 +621,7 @@
                   </Select.Trigger>
                   <Select.Portal>
                     <Select.Content
-                      class="bg-background/50 backdrop-blur-md border border-border/80 rounded-3xl p-1 z-500 shadow-glass w-[160px]"
+                      class="bg-background/50 backdrop-blur-md border border-border/80 rounded-3xl p-1 z-500 shadow-glass w-[180px]"
                     >
                       <Select.Item value="Auto" label="Auto (Default)" />
                       <Select.Item value="Unison" label="Unison" />
@@ -628,11 +634,16 @@
                     </Select.Content>
                   </Select.Portal>
                 </Select.Root>
-                <div class="w-[clamp(6.5rem,8vw,7.5rem)]"></div>
               </div>
-
-              <Lyrics />
+              <div class="flex-1 min-h-0 relative overflow-hidden">
+                <Lyrics />
+              </div>
             {:else if activeSidebar === "listen-together"}
+              {#if syncStore.status !== "disconnected"}
+                <div class="h-12 flex items-center px-4 select-none">
+                  <h2 class="text-lg font-bold text-foreground">Listen Together</h2>
+                </div>
+              {/if}
               <ListenTogether />
             {/if}
           </div>
@@ -732,7 +743,6 @@
   </Dialog.Root>
 
   <SettingsDialog bind:open={showSettingsModal} />
-  <WindowControls />
 
     <Glow />
   </section>

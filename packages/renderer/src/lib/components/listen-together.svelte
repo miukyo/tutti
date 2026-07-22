@@ -11,12 +11,7 @@
     UsersRoundIcon,
   } from "@lucide/svelte/icons";
   import Spinner from "./ui/spinner/spinner.svelte";
-</script>
-
-{#if syncStore.status !== "disconnected"}
-  <h2 class="text-lg font-bold absolute pt-5 px-2 z-10">Listen Together</h2>
-{/if}
-<div
+</script><div
   class="w-full h-12 absolute top-0 bg-linear-to-b from-background to-transparent z-5 pointer-events-none"
 ></div>
 <div
