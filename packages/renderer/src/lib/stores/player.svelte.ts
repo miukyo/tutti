@@ -1,5 +1,6 @@
 import { ytmusic, updateDiscordPresence } from "@app/preload";
 import { tick } from "svelte";
+import { equalizer } from "./equalizer.svelte";
 
 export interface Track {
   videoId: string;
@@ -85,6 +86,7 @@ class PlayerStore {
   init() {
     if (typeof window !== "undefined" && !this.audio) {
       this.audio = new Audio();
+      equalizer.init(this.audio);
       this.loadState();
 
       if (this.isAuthed === null) {

@@ -9,10 +9,12 @@
     CaseSensitiveIcon,
     KeyboardIcon,
     RotateCcwIcon,
+    SlidersIcon,
   } from "@lucide/svelte/icons";
   import Switch from "./ui/switch/switch.svelte";
   import ScrollArea from "./ui/scroll-area/scroll-area.svelte";
   import Slider from "./ui/slider/slider.svelte";
+  import EqualizerSettings from "./equalizer-settings.svelte";
 
   let {
     open = $bindable(false),
@@ -20,7 +22,7 @@
     open: boolean;
   } = $props();
 
-  let activeTab = $state<"general" | "lyrics" | "hotkeys">("general");
+  let activeTab = $state<"general" | "lyrics" | "hotkeys" | "equalizer">("general");
   let clearingCache = $state(false);
   let clearCacheStatus = $state<"idle" | "done" | "error">("idle");
 
@@ -175,6 +177,17 @@
         >
           <KeyboardIcon class="size-4" />
           <span>Hotkeys</span>
+        </Button>
+        <Button
+          variant={activeTab === "equalizer" ? "default" : "ghost"}
+          class="justify-start gap-2.5 rounded-2xl px-3 py-2.5 text-sm font-medium transition-all text-left cursor-pointer {activeTab ===
+          'equalizer'
+            ? ''
+            : 'text-muted-foreground hover:text-foreground'}"
+          onclick={() => (activeTab = "equalizer")}
+        >
+          <SlidersIcon class="size-4" />
+          <span>Equalizer</span>
         </Button>
       </div>
 
@@ -373,6 +386,8 @@
                 {/each}
               </ScrollArea>
             </div>
+          {:else if activeTab === "equalizer"}
+            <EqualizerSettings />
           {/if}
         </div>
       </div>
