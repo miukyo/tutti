@@ -74,6 +74,7 @@
   import CreatePlaylistDialog from "$lib/components/create-playlist-dialog.svelte";
   import FloatingLyrics from "$lib/views/FloatingLyrics.svelte";
   import SettingsDialog from "$lib/components/settings-dialog.svelte";
+  import WindowControls from "$lib/components/window-controls.svelte";
 
   let accountInfo = $state<AccountInfo | null>(null);
   let sidebarPlaylists = $state<PlaylistDetailed[]>([]);
@@ -576,7 +577,10 @@
         <Resizable.Pane id="right" minSize={20} defaultSize={20} maxSize={30}>
           <div class="size-full overflow-hidden relative">
             {#if activeSidebar === "queue"}
-              <h2 class="text-lg font-bold absolute pt-5 px-2 z-10">Queue</h2>
+              <div class="absolute left-2 right-2 flex items-center justify-between z-10 select-none" style="top: clamp(0.5rem, 1vw, 1rem); height: clamp(2.2rem, 2.5vw, 2.6rem);">
+                <h2 class="text-lg font-bold text-foreground">Queue</h2>
+                <div class="w-[clamp(6.5rem,8vw,7.5rem)]"></div>
+              </div>
               <div
                 class="w-full h-12 absolute top-0 bg-linear-to-b from-background to-transparent z-5 pointer-events-none"
               ></div>
@@ -584,7 +588,7 @@
                 class="w-full h-12 absolute bottom-0 bg-linear-to-t from-background to-transparent z-5 pointer-events-none"
               ></div>
               <ScrollArea class="flex-1 min-h-0 pr-2 h-full">
-                <div class="h-12"></div>
+                <div class="h-16"></div>
                 {#if queue.length > 0}
                   <SongTable
                     songs={queue}
@@ -599,7 +603,7 @@
                 <div class="h-12"></div>
               </ScrollArea>
             {:else if activeSidebar === "lyrics"}
-              <div class="absolute pt-4.5 z-10">
+              <div class="absolute left-2 right-2 flex items-center justify-between z-10" style="top: clamp(0.5rem, 1vw, 1rem); height: clamp(2.2rem, 2.5vw, 2.6rem);">
                 <Select.Root type="single" bind:value={player.selectedSource}>
                   <Select.Trigger
                     class="w-[150px] shadow-glass bg-background/50 border border-border backdrop-blur-md rounded-full focus-visible:ring-0 overflow-hidden"
@@ -624,6 +628,7 @@
                     </Select.Content>
                   </Select.Portal>
                 </Select.Root>
+                <div class="w-[clamp(6.5rem,8vw,7.5rem)]"></div>
               </div>
 
               <Lyrics />
@@ -727,6 +732,7 @@
   </Dialog.Root>
 
   <SettingsDialog bind:open={showSettingsModal} />
+  <WindowControls />
 
     <Glow />
   </section>

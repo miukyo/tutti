@@ -198,9 +198,38 @@ function onRequestPlayerState(callback: () => void): () => void {
   };
 }
 
+function minimizeWindow(): void {
+  ipcRenderer.send('window-minimize');
+}
+
+function maximizeWindow(): void {
+  ipcRenderer.send('window-maximize');
+}
+
+function closeWindow(): void {
+  ipcRenderer.send('window-close');
+}
+
+function isWindowMaximized(): Promise<boolean> {
+  return ipcRenderer.invoke('window-is-maximized');
+}
+
+function onMaximizedStatus(callback: (isMaximized: boolean) => void): () => void {
+  const listener = (_event: any, status: boolean) => callback(status);
+  ipcRenderer.on('window-maximized-status', listener);
+  return () => {
+    ipcRenderer.off('window-maximized-status', listener);
+  };
+}
+
 export {
   updatePlayerState,
   onPlayerStateUpdated,
   requestPlayerState,
   onRequestPlayerState,
+  minimizeWindow,
+  maximizeWindow,
+  closeWindow,
+  isWindowMaximized,
+  onMaximizedStatus,
 };

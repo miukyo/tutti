@@ -1,6 +1,6 @@
 import type { AppModule } from '../AppModule.js';
 import { ModuleContext } from '../ModuleContext.js';
-import { BrowserWindow, session, app } from 'electron';
+import { BrowserWindow, session, app, ipcMain } from 'electron';
 import type { AppInitConfig } from '../AppInitConfig.js';
 import path from 'node:path';
 
@@ -41,26 +41,56 @@ class WindowManager implements AppModule {
       }
     );
 
+    ipcMain.on('window-minimize', () => {
+      this.#mainWindow?.minimize();
+    });
+    ipcMain.on('window-maximize', () => {
+      const { screen } = require('electron');
+      if (this.#mainWindow) {
+        //console.log('Before maximize - bounds:', this.#mainWindow.getBounds());
+        //console.log('Display workArea:', screen.getPrimaryDisplay().workAreaSize);
+        if (this.#mainWindow.isMaximized()) {
+          this.#mainWindow.unmaximize();
+        } else {
+          this.#mainWindow.maximize();
+        }
+        //console.log('After maximize - bounds:', this.#mainWindow.getBounds());
+        //console.log('isMaximized:', this.#mainWindow.isMaximized());
+      }
+    });
+    ipcMain.on('window-close', () => {
+      this.#mainWindow?.close();
+    });
+    ipcMain.handle('window-is-maximized', () => {
+      return this.#mainWindow?.isMaximized() ?? false;
+    });
+
     await this.restoreOrCreateWindow(true);
     app.on('second-instance', () => this.restoreOrCreateWindow(true));
     app.on('activate', () => this.restoreOrCreateWindow(true));
   }
 
   async createWindow(): Promise<BrowserWindow> {
+    const { screen } = require('electron');
+    const primaryDisplay = screen.getPrimaryDisplay();
+    const { width: workWidth, height: workHeight } = primaryDisplay.workAreaSize;
+    const defaultWidth = 1280;
+    const defaultHeight = 700;
+    const x = Math.floor((workWidth - defaultWidth) / 2);
+    const y = Math.floor((workHeight - defaultHeight) / 2);
+
     const browserWindow = new BrowserWindow({
       show: false, // Use the 'ready-to-show' event to show the instantiated BrowserWindow.
-      minWidth: 1280,
-      minHeight: 700,
+      width: defaultWidth,
+      height: defaultHeight,
+      x: x,
+      y: y,
+      center: true,
+      minWidth: defaultWidth,
+      minHeight: defaultHeight,
       autoHideMenuBar: true,
       icon: path.join(app.getAppPath(), 'buildResources', 'icon.png'),
       titleBarStyle: 'hidden',
-      ...(process.platform !== 'darwin' ? {
-        titleBarOverlay: {
-          height: 8,
-          color: "#00000000",
-          symbolColor: "white"
-        }
-      } : {}),
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
@@ -79,6 +109,14 @@ class WindowManager implements AppModule {
 
     browserWindow.on('closed', () => {
       this.#mainWindow = null;
+    });
+
+    browserWindow.on('maximize', () => {
+      browserWindow.webContents.send('window-maximized-status', true);
+    });
+
+    browserWindow.on('unmaximize', () => {
+      browserWindow.webContents.send('window-maximized-status', false);
     });
 
     (browserWindow as any).isMainWindow = true;
