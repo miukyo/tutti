@@ -373,44 +373,7 @@
     return indices.join(",");
   });
 
-  let stableTargetIndex = $state(-1);
-  let lastIndexChangeTime = 0;
-
-  // Track track changes to reset time and index immediately
-  $effect(() => {
-    if (player.currentTrack) {
-      lastIndexChangeTime = 0;
-      stableTargetIndex = -1;
-    }
-  });
-
-  $effect(() => {
-    const newIndex = scrollTargetIndex;
-    if (newIndex === -1) {
-      stableTargetIndex = -1;
-      return;
-    }
-
-    const now = performance.now();
-    const timeSinceLastChange = now - lastIndexChangeTime;
-
-    let timeoutId: any = null;
-
-    if (timeSinceLastChange >= 3000) {
-      stableTargetIndex = newIndex;
-      lastIndexChangeTime = now;
-    } else {
-      const delay = 3000 - timeSinceLastChange;
-      timeoutId = setTimeout(() => {
-        stableTargetIndex = newIndex;
-        lastIndexChangeTime = performance.now();
-      }, delay);
-    }
-
-    return () => {
-      if (timeoutId) clearTimeout(timeoutId);
-    };
-  });
+  let stableTargetIndex = $derived(scrollTargetIndex);
 
   let scrollRatio = $derived(isFloating ? 0.3 : 0.45);
 
@@ -523,7 +486,6 @@
       player.seek(line.startTimeMs / 1000);
       isUserScrolling = false;
       userScrollOffset = 0;
-      lastIndexChangeTime = 0;
     }
   }
 
@@ -676,8 +638,8 @@
               ? `transform: translateY(${translateY}px); transition: ${
                   isUserScrolling
                     ? "transform 0.2s cubic-bezier(0.33, 1, 0.68, 1);"
-                    : "transform 2s cubic-bezier(0.65, 0, 0.35, 1)"
-                }; transition-delay: ${staggerDelay}ms;`
+                    : "transform 0.6s cubic-bezier(0.25, 1, 0.5, 1);"
+                };`
               : ""}
           >
             {#if lyricsResult.synced && line.words}
