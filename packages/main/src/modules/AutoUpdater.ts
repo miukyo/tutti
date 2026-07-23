@@ -1,6 +1,6 @@
 import {AppModule} from '../AppModule.js';
 import electronUpdater, {type AppUpdater, type Logger} from 'electron-updater';
-import { ipcMain, BrowserWindow } from 'electron';
+import { ipcMain, BrowserWindow, app } from 'electron';
 
 type DownloadNotification = Parameters<AppUpdater['checkForUpdatesAndNotify']>[0];
 
@@ -25,42 +25,54 @@ export class AutoUpdater implements AppModule {
 
   async enable(): Promise<void> {
     const updater = this.getAutoUpdater();
+    updater.logger = this.#logger || console;
+    updater.fullChangelog = true;
+    updater.autoDownload = true;
+    updater.autoInstallOnAppQuit = true;
+
+    if (import.meta.env.VITE_DISTRIBUTION_CHANNEL) {
+      updater.channel = import.meta.env.VITE_DISTRIBUTION_CHANNEL;
+    }
 
     ipcMain.handle('check-for-updates', async () => {
+      if (process.platform === 'darwin' && typeof app.isInApplicationsFolder === 'function' && !app.isInApplicationsFolder()) {
+        console.warn('App is not in Applications folder; auto update on macOS may require moving app to /Applications.');
+      }
+
       return new Promise((resolve) => {
         let resolved = false;
-        
+
         const onUpdateAvailable = (info: any) => {
           if (resolved) return;
           resolved = true;
           cleanup();
           resolve({ status: 'available', version: info.version });
         };
-        
+
         const onUpdateNotAvailable = (info: any) => {
           if (resolved) return;
           resolved = true;
           cleanup();
           resolve({ status: 'not-available', version: info.version });
         };
-        
+
         const onError = (err: any) => {
           if (resolved) return;
           resolved = true;
           cleanup();
           resolve({ status: 'error', message: err?.message || String(err) });
         };
-        
+
         const cleanup = () => {
           updater.off('update-available', onUpdateAvailable);
           updater.off('update-not-available', onUpdateNotAvailable);
           updater.off('error', onError);
         };
-        
+
         updater.on('update-available', onUpdateAvailable);
         updater.on('update-not-available', onUpdateNotAvailable);
         updater.on('error', onError);
-        
+
         updater.checkForUpdates().catch((err) => {
           onError(err);
         });
@@ -68,7 +80,20 @@ export class AutoUpdater implements AppModule {
     });
 
     ipcMain.handle('restart-and-install', () => {
-      updater.quitAndInstall();
+      try {
+        if (process.platform === 'darwin' && typeof app.isInApplicationsFolder === 'function' && !app.isInApplicationsFolder()) {
+          try {
+            app.moveToApplicationsFolder();
+            return;
+          } catch (moveErr) {
+            console.error('Failed to move app to Applications folder:', moveErr);
+          }
+        }
+        updater.quitAndInstall(false, true);
+      } catch (err) {
+        console.error('Failed to quit and install update:', err);
+        app.quit();
+      }
     });
 
     updater.on('update-downloaded', (info) => {
@@ -76,6 +101,10 @@ export class AutoUpdater implements AppModule {
       if (window) {
         window.webContents.send('update-downloaded', info);
       }
+    });
+
+    updater.on('error', (err) => {
+      console.error('AutoUpdater error:', err);
     });
 
     await this.runAutoUpdater();
@@ -91,8 +120,10 @@ export class AutoUpdater implements AppModule {
   async runAutoUpdater() {
     const updater = this.getAutoUpdater();
     try {
-      updater.logger = this.#logger || null;
+      updater.logger = this.#logger || console;
       updater.fullChangelog = true;
+      updater.autoDownload = true;
+      updater.autoInstallOnAppQuit = true;
 
       if (import.meta.env.VITE_DISTRIBUTION_CHANNEL) {
         updater.channel = import.meta.env.VITE_DISTRIBUTION_CHANNEL;

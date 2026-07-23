@@ -15,6 +15,9 @@ export default /** @type import('electron-builder').Configuration */
     repo: 'tutti',
   },
   generateUpdatesFilesForAllChannels: true,
+  mac: {
+    target: ['dmg', 'zip'],
+  },
   linux: {
     target: ['deb'],
   },
