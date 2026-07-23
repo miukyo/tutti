@@ -48,9 +48,12 @@ jobs:
           ITCH_GAME: ${{ secrets.ITCH_GAME }}
           ITCH_USERNAME: ${{ secrets.ITCH_USERNAME }}
         run: |
-          echo "windows_file=$(find dist -name "*.exe" -maxdepth 1 | head -n 1)" >> $GITHUB_OUTPUT
-          echo "mac_file=$(find dist -name "*.dmg" -maxdepth 1 | head -n 1)" >> $GITHUB_OUTPUT
-          echo "linux_file=$(find dist -name "*.deb" -maxdepth 1 | head -n 1)" >> $GITHUB_OUTPUT
+          echo "windows_x64_file=$(find dist -maxdepth 1 -type f -name "*x64*.exe" | head -n 1)" >> $GITHUB_OUTPUT
+          echo "windows_arm64_file=$(find dist -maxdepth 1 -type f -name "*arm64*.exe" | head -n 1)" >> $GITHUB_OUTPUT
+          echo "mac_x64_file=$(find dist -maxdepth 1 -type f -name "*x64*.dmg" | head -n 1)" >> $GITHUB_OUTPUT
+          echo "mac_arm64_file=$(find dist -maxdepth 1 -type f -name "*arm64*.dmg" | head -n 1)" >> $GITHUB_OUTPUT
+          echo "linux_x64_file=$(find dist -maxdepth 1 -type f -name "*x64*.deb" | head -n 1)" >> $GITHUB_OUTPUT
+          echo "linux_arm64_file=$(find dist -maxdepth 1 -type f -name "*arm64*.deb" | head -n 1)" >> $GITHUB_OUTPUT
 
           if [ -n "$BUTLER_CREDENTIALS" ] && [ -n "$ITCH_GAME" ] && [ -n "$ITCH_USERNAME" ]; then
             echo "has_credentials=true" >> $GITHUB_OUTPUT
@@ -58,37 +61,70 @@ jobs:
             echo "has_credentials=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Deploy Windows to Itch.io
-        if: ${{ steps.locate-files.outputs.windows_file != '' && steps.locate-files.outputs.has_credentials == 'true' }}
+      - name: Deploy Windows x64 to Itch.io
+        if: ${{ steps.locate-files.outputs.windows_x64_file != '' && steps.locate-files.outputs.has_credentials == 'true' }}
         uses: yeslayla/butler-publish-itchio-action@master
         env:
           BUTLER_CREDENTIALS: ${{ secrets.BUTLER_CREDENTIALS }}
-          CHANNEL: windows
+          CHANNEL: windows-x64
           ITCH_GAME: ${{ secrets.ITCH_GAME }}
           ITCH_USER: ${{ secrets.ITCH_USERNAME }}
-          PACKAGE: ${{ steps.locate-files.outputs.windows_file }}
+          PACKAGE: ${{ steps.locate-files.outputs.windows_x64_file }}
           VERSION: ${{ inputs.app-version }}
 
-      - name: Deploy macOS to Itch.io
-        if: ${{ steps.locate-files.outputs.mac_file != '' && steps.locate-files.outputs.has_credentials == 'true' }}
+      - name: Deploy Windows arm64 to Itch.io
+        if: ${{ steps.locate-files.outputs.windows_arm64_file != '' && steps.locate-files.outputs.has_credentials == 'true' }}
         uses: yeslayla/butler-publish-itchio-action@master
         env:
           BUTLER_CREDENTIALS: ${{ secrets.BUTLER_CREDENTIALS }}
-          CHANNEL: osx
+          CHANNEL: windows-arm64
           ITCH_GAME: ${{ secrets.ITCH_GAME }}
           ITCH_USER: ${{ secrets.ITCH_USERNAME }}
-          PACKAGE: ${{ steps.locate-files.outputs.mac_file }}
+          PACKAGE: ${{ steps.locate-files.outputs.windows_arm64_file }}
           VERSION: ${{ inputs.app-version }}
 
-      - name: Deploy Linux to Itch.io
-        if: ${{ steps.locate-files.outputs.linux_file != '' && steps.locate-files.outputs.has_credentials == 'true' }}
+      - name: Deploy macOS x64 to Itch.io
+        if: ${{ steps.locate-files.outputs.mac_x64_file != '' && steps.locate-files.outputs.has_credentials == 'true' }}
         uses: yeslayla/butler-publish-itchio-action@master
         env:
           BUTLER_CREDENTIALS: ${{ secrets.BUTLER_CREDENTIALS }}
-          CHANNEL: linux
+          CHANNEL: osx-x64
           ITCH_GAME: ${{ secrets.ITCH_GAME }}
           ITCH_USER: ${{ secrets.ITCH_USERNAME }}
-          PACKAGE: ${{ steps.locate-files.outputs.linux_file }}
+          PACKAGE: ${{ steps.locate-files.outputs.mac_x64_file }}
+          VERSION: ${{ inputs.app-version }}
+
+      - name: Deploy macOS arm64 to Itch.io
+        if: ${{ steps.locate-files.outputs.mac_arm64_file != '' && steps.locate-files.outputs.has_credentials == 'true' }}
+        uses: yeslayla/butler-publish-itchio-action@master
+        env:
+          BUTLER_CREDENTIALS: ${{ secrets.BUTLER_CREDENTIALS }}
+          CHANNEL: osx-arm64
+          ITCH_GAME: ${{ secrets.ITCH_GAME }}
+          ITCH_USER: ${{ secrets.ITCH_USERNAME }}
+          PACKAGE: ${{ steps.locate-files.outputs.mac_arm64_file }}
+          VERSION: ${{ inputs.app-version }}
+
+      - name: Deploy Linux x64 to Itch.io
+        if: ${{ steps.locate-files.outputs.linux_x64_file != '' && steps.locate-files.outputs.has_credentials == 'true' }}
+        uses: yeslayla/butler-publish-itchio-action@master
+        env:
+          BUTLER_CREDENTIALS: ${{ secrets.BUTLER_CREDENTIALS }}
+          CHANNEL: linux-x64
+          ITCH_GAME: ${{ secrets.ITCH_GAME }}
+          ITCH_USER: ${{ secrets.ITCH_USERNAME }}
+          PACKAGE: ${{ steps.locate-files.outputs.linux_x64_file }}
+          VERSION: ${{ inputs.app-version }}
+
+      - name: Deploy Linux arm64 to Itch.io
+        if: ${{ steps.locate-files.outputs.linux_arm64_file != '' && steps.locate-files.outputs.has_credentials == 'true' }}
+        uses: yeslayla/butler-publish-itchio-action@master
+        env:
+          BUTLER_CREDENTIALS: ${{ secrets.BUTLER_CREDENTIALS }}
+          CHANNEL: linux-arm64
+          ITCH_GAME: ${{ secrets.ITCH_GAME }}
+          ITCH_USER: ${{ secrets.ITCH_USERNAME }}
+          PACKAGE: ${{ steps.locate-files.outputs.linux_arm64_file }}
           VERSION: ${{ inputs.app-version }}
 
 

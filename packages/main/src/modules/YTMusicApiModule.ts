@@ -130,7 +130,11 @@ export function ytmusicModule(): AppModule {
 
       ipcMain.handle('ytmusic', async (_event, method: string, ...args: any[]) => {
         if (method === 'login') {
-          return await handleLogin();
+          const success = await handleLogin();
+          if (success) {
+            await yt.clearCache();
+          }
+          return success;
         }
 
         if (method === 'logout') {
@@ -140,6 +144,7 @@ export function ytmusicModule(): AppModule {
           } catch (e) {
             console.error("Failed to delete cookies file:", e);
           }
+          await yt.clearCache();
           initializedPromise = yt.initialize(null).then(() => {});
           await initializedPromise;
           return true;

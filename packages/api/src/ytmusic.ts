@@ -57,11 +57,13 @@ const cacheDir = path.join(tuttiPath, 'cache');
 
 export const userPlaylistIds = new Set<string>();
 
+const fileSystemCache = new FileSystemCache({
+  cacheDirectory: cacheDir,
+  ttl: 60 * 60 * 1000 // 1 hour TTL
+});
+
 const cachedFetch = NodeFetchCache.create({
-  cache: new FileSystemCache({
-    cacheDirectory: cacheDir,
-    ttl: 60 * 60 * 1000 // 1 hour TTL
-  }),
+  cache: fileSystemCache,
   calculateCacheKey: async (url, init) => {
     const body = init?.body || '';
     const hash = crypto.createHash('md5');
@@ -70,6 +72,24 @@ const cachedFetch = NodeFetchCache.create({
     return hash.digest('hex');
   }
 });
+
+export async function clearCache(): Promise<void> {
+  userPlaylistIds.clear();
+  try {
+    await fileSystemCache.clear();
+  } catch (e) {
+    console.error('Failed to clear file system cache via cacache:', e);
+    try {
+      if (fs.existsSync(cacheDir)) {
+        fs.rmSync(cacheDir, { recursive: true, force: true });
+      }
+    } catch (rmErr) {
+      console.error('Failed to remove cache directory:', rmErr);
+    }
+  }
+}
+
+export const deleteCache = clearCache;
 
 const lyricsCachedFetch = NodeFetchCache.create({
   cache: new FileSystemCache({
@@ -235,6 +255,14 @@ export class YTMusic {
   private accountName: string | null = null;
 
   constructor() { }
+
+  async clearCache(): Promise<void> {
+    await clearCache();
+  }
+
+  async deleteCache(): Promise<void> {
+    await clearCache();
+  }
 
   async login(): Promise<boolean> {
     // Handled in the main process IPC layer

@@ -63,7 +63,9 @@ const ytmusicMethods = [
   'getEpisode',
   'getEpisodesPlaylist',
   'login',
-  'logout'
+  'logout',
+  'clearCache',
+  'deleteCache'
 ] as const;
 
 const ytmusicObj: any = {};

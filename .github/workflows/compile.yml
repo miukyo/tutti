@@ -34,13 +34,16 @@ jobs:
           - windows-latest
           - ubuntu-latest
           - macos-latest
+        arch:
+          - x64
+          - arm64
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v6
 
       - run: npm version "${{inputs.app-version}}" --no-git-tag-version
       - run: npm install
-      - run: npm run compile -- -p never
+      - run: npm run compile -- --${{ matrix.arch }} -p never
         env:
           VITE_DISTRIBUTION_CHANNEL: ${{inputs.distribution-channel}}
           VITE_TURN_USERNAME: ${{ secrets.VITE_TURN_USERNAME }}
@@ -53,5 +56,5 @@ jobs:
       - name: Upload compiled app
         uses: actions/upload-artifact@v7
         with:
-          name: ${{ matrix.os }}-${{inputs.distribution-channel}}
+          name: ${{ matrix.os }}-${{ matrix.arch }}-${{inputs.distribution-channel}}
           path: dist

@@ -13,6 +13,8 @@ import { discordPresenceModule } from './modules/DiscordPresence.js';
 import { deepLinkModule } from './modules/DeepLink.js';
 import { floatingLyricsModule } from './modules/FloatingLyricsModule.js';
 
+import { clearCache as clearApiCache } from '@app/api';
+
 export async function initApp(initConfig: AppInitConfig) {
   app.name = 'Tutti';
   if (process.platform === 'win32') {
@@ -29,6 +31,7 @@ export async function initApp(initConfig: AppInitConfig) {
     await session.defaultSession.clearStorageData({
       storages: ['appcache', 'shadercache', 'cachestorage', 'serviceworkers']
     });
+    await clearApiCache();
   });
 
   const modules = [
