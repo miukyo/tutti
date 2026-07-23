@@ -20,7 +20,7 @@
   "devDependencies": {
     "@app/electron-versions": "*",
     "electron-devtools-installer": "4.0.0",
-    "electron": "41.10.0",
+    "electron": "43.2.0",
     "typescript": "6.0.2",
     "vite": "^8.1.3"
   }
