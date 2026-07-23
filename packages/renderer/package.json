@@ -23,7 +23,7 @@
     "paneforge": "^1.0.2",
     "shadcn-svelte": "^1.3.0",
     "svelte": "^5.53.12",
-    "svelte-check": "^4.4.5",
+    "svelte-check": "^4.7.2",
     "svelte-spa-router": "^5.1.1",
     "tailwind-merge": "^3.6.0",
     "tailwind-variants": "^3.2.2",
