@@ -1,7 +1,7 @@
 
 <div style="display: flex; justify-content: center;">
 
-<img src="buildResources/icon.png" width="150" />
+<img src="buildResources/logo.png" width="150" />
 
 </div>
 
